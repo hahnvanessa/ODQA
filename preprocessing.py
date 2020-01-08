@@ -2,12 +2,21 @@
 from argparse import ArgumentParser
 # Json to parse files
 import json
+# Pickle to save dictionary
+import pickle
 
 
-def process_searchqa():
+def process_searchqa(folder, set_type) -> dict:
     pass
 
-def process_quasar(folder, set_type, doc_size):
+def process_quasar(folder, set_type, doc_size) -> dict:
+    '''
+    Processes the quasar t set by mapping question ids to corresponding context snippets.
+    :param folder: topmost folder for the dataset
+    :param set_type: train, dev or test
+    :param doc_size: short or large
+    :return:
+    '''
     # Question File and Path
     question_dic = {}
     question_file = set_type + "_questions.json"
@@ -45,7 +54,33 @@ def process_quasar(folder, set_type, doc_size):
         for qid, q in question_dic.items():
             assert len(q["contexts"])>0, "Question {} missing context".format(qid)
 
+        print("Question dic of type <quasar> and set type <{}> has {} entries.".format(set_type, len(question_dic)))
         return question_dic
+
+#todo: causes memory error if used with the train set, the test set works and returns a small file of 43MB
+def save_to_file(path, question_dic, type, set_type, doc_size=None):
+    '''
+    Save question dictionary to a file.
+    :param path: filepath
+    :param type: quasar or searchqa
+    :param set_type: train, dev or set
+    :param doc_size: only for quasar short or long
+    :param question_dic: mapping of question ids to contexts
+    :return:
+    '''
+    # Check whether question dic contains values
+    assert len(question_dic)>0, "question dic is empty"
+
+    # Create filename
+    if type == "quasar":
+        filename = "_".join([type, set_type, doc_size]) + ".pkl"
+    else:
+        filename = "_".join([type, set_type]) + ".pkl"
+    full_path_to_file = "\\".join([path, filename])
+    with open(full_path_to_file, "wb") as of:
+        pickle.dump(question_dic, of)
+    print("pickled file {} and saved it to {}".format(filename, full_path_to_file))
+
 
 def main(type, folder, set_type, doc_size):
     '''
@@ -59,17 +94,16 @@ def main(type, folder, set_type, doc_size):
     if type == "quasar":
         return process_quasar(folder, set_type, doc_size)
     elif type == "searchqa":
-        return process_searchqa()
+        return process_searchqa(folder, set_type)
     else:
         # A wrong type should be identified by argparse already but this is another safeguard
         return ValueError("type must be either 'quasar' or 'searchqa'")
 
-    # Return None for now
+    # todo: appropriate return or no return
     return None
 
 
-def save_to_file():
-    pass
+
 
 if __name__ == '__main__':
     parser = ArgumentParser()
@@ -92,7 +126,9 @@ if __name__ == '__main__':
     args = parser.parse_args() # Argparse returns a namespace object
 
     # Call the main function with with the argparse arguments
-    main(type=args.TYPE, folder=args.FOLDERPATH, set_type=args.SETTYPE, doc_size=args.DOCSIZE)
+    test_dic = main(type=args.TYPE, folder=args.FOLDERPATH, set_type=args.SETTYPE, doc_size=args.DOCSIZE)
+    sample_path = "F:\\1QuestionAnswering\\quasar\\quasar_t"
+    save_to_file(sample_path,test_dic,args.TYPE, args.SETTYPE, args.DOCSIZE)
 
     # Sample call
     #   python preprocessing.py -t "quasar" -f "F:\1QuestionAnswering\quasar\quasar_t\qt" -s "train"
