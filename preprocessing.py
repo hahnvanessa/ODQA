@@ -1,7 +1,12 @@
 from argparse import ArgumentParser
 
 
+def process_searchqa():
+    pass
 
+def process_quasar(folder, set_type, doc_size):
+
+    pass
 
 def main(type, folder, set_type, doc_size):
     '''
@@ -11,6 +16,15 @@ def main(type, folder, set_type, doc_size):
     :return: dictionary of type {question_id : {question:"", category:"", snippets:[]}}
     '''
     print(type, folder, set_type, doc_size)
+
+    if type == "quasar":
+        return process_quasar(folder, set_type, doc_size)
+    elif type == "searchqa":
+        return process_searchqa()
+    else:
+        return ValueError("type must be either 'quasar' or 'searchqa'")
+
+    # Return None for now
     return None
 
 
@@ -19,6 +33,8 @@ def save_to_file():
 
 if __name__ == '__main__':
     parser = ArgumentParser()
+
+    # Specify the arguments the script will take from the command line
     # Type
     parser.add_argument("-t", "--type", required=True, dest="TYPE",
                         help="Specify type of question answer set. either searchqa or quasar", choices=['searchqa', 'quasar'])
@@ -31,8 +47,12 @@ if __name__ == '__main__':
 
     # Optional Argument: Size of pseudo documents (only relevant for quasar)
     parser.add_argument("-ds", "--docsize", dest="DOCSIZE", help="specify size of pseudo documents", choices=['long', 'short'], default="short")
-    args = parser.parse_args()
 
-    # Argparse returns a namespace object
-    print(args)
+    # Return an argparse object by taking the commands from the command line (using sys.argv)
+    args = parser.parse_args() # Argparse returns a namespace object
+
+    # Call the main function with with the argparse arguments
     main(type=args.TYPE, folder=args.FOLDERPATH, set_type=args.SETTYPE, doc_size=args.DOCSIZE)
+
+    # Sample call
+    #python preprocessing.py - t "quasar" - f "/love/is" -s "train"
