@@ -1,10 +1,34 @@
+# Command line interaction
 from argparse import ArgumentParser
+# Json to parse files
+import json
 
 
 def process_searchqa():
     pass
 
 def process_quasar(folder, set_type, doc_size):
+    # Question File and Path
+    question_dic = {}
+    question_file = set_type + "_questions.json"
+    question_file_path = "\\".join([folder, "questions", question_file, question_file])
+    with open(question_file_path, "r") as qf:
+        # Parse each line separate to avoid memory issues
+        for line in qf:
+            parsed_line = json.loads(line)
+            question = parsed_line["question"]
+            question_id = parsed_line["uid"]
+            question_answer = parsed_line["answer"]
+            question_dic[question_id] = {"question":question, "answer":question_answer, "contexts":[]}
+
+
+    # Contexts File and Path
+    context_file = set_type + "_contexts.json"
+    context_file_path = "\\".join([folder, "contexts", doc_size, context_file, context_file])
+    print(context_file_path)
+    with open(context_file_path, "r") as qf:
+        pass
+        # todo: throw an exception if there is no question for a found answer, i.e. the uid is not matching
 
     pass
 
@@ -55,4 +79,4 @@ if __name__ == '__main__':
     main(type=args.TYPE, folder=args.FOLDERPATH, set_type=args.SETTYPE, doc_size=args.DOCSIZE)
 
     # Sample call
-    #python preprocessing.py - t "quasar" - f "/love/is" -s "train"
+    #   python preprocessing.py -t "quasar" -f "F:\1QuestionAnswering\quasar\quasar_t\qt" -s "train"
