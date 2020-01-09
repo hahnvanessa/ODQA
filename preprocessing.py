@@ -139,4 +139,4 @@ if __name__ == '__main__':
     save_to_file(output_path,test_dic,args.TYPE, args.SETTYPE, args.DOCSIZE)
 
     # Sample call
-    # python3 preprocessing.py -t "quasar" -f "/home/katja/Documents/QA/quasar-t" -s "train"
+    # python3 preprocessing.py -t "quasar" -f /Users/vanessahahn/Documents/QA/quasar-t  -s "dev"
