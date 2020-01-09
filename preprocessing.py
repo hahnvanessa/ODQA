@@ -1,9 +1,12 @@
+import os 
 # Command line interaction
 from argparse import ArgumentParser
 # Json to parse files
 import json
 # Pickle to save dictionary
 import pickle
+# Handle the file paths
+from pathlib import Path
 
 
 def process_searchqa(folder, set_type) -> dict:
@@ -20,7 +23,7 @@ def process_quasar(folder, set_type, doc_size) -> dict:
     # Question File and Path
     question_dic = {}
     question_file = set_type + "_questions.json"
-    question_file_path = "\\".join([folder, "questions", question_file, question_file])
+    question_file_path = Path("/".join([folder, "questions", question_file]))
     with open(question_file_path, "r") as qf:
         # Parse each line separate to avoid memory issues
         for line in qf:
@@ -35,8 +38,7 @@ def process_quasar(folder, set_type, doc_size) -> dict:
 
     # Contexts File and Path
     context_file = set_type + "_contexts.json"
-    context_file_path = "\\".join([folder, "contexts", doc_size, context_file, context_file])
-    print(context_file_path)
+    context_file_path = Path("/".join([folder, "contexts", doc_size, context_file]))
     with open(context_file_path, "r") as cf:
         for line in cf:
             parsed_answer = json.loads(line)
@@ -76,7 +78,13 @@ def save_to_file(path, question_dic, type, set_type, doc_size=None):
         filename = "_".join([type, set_type, doc_size]) + ".pkl"
     else:
         filename = "_".join([type, set_type]) + ".pkl"
-    full_path_to_file = "\\".join([path, filename])
+    full_path_to_file = Path("/".join([str(path), str(filename)]))
+
+    # Create the output directory if doesn't exist
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+    # Write to the file
     with open(full_path_to_file, "wb") as of:
         pickle.dump(question_dic, of)
     print("pickled file {} and saved it to {}".format(filename, full_path_to_file))
@@ -127,8 +135,8 @@ if __name__ == '__main__':
 
     # Call the main function with with the argparse arguments
     test_dic = main(type=args.TYPE, folder=args.FOLDERPATH, set_type=args.SETTYPE, doc_size=args.DOCSIZE)
-    sample_path = "F:\\1QuestionAnswering\\quasar\\quasar_t"
-    save_to_file(sample_path,test_dic,args.TYPE, args.SETTYPE, args.DOCSIZE)
+    output_path = Path(os.getcwd() + '/outputs')
+    save_to_file(output_path,test_dic,args.TYPE, args.SETTYPE, args.DOCSIZE)
 
     # Sample call
-    #   python preprocessing.py -t "quasar" -f "F:\1QuestionAnswering\quasar\quasar_t\qt" -s "train"
+    # python3 preprocessing.py -t "quasar" -f "/home/katja/Documents/QA/quasar-t" -s "train"
