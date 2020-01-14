@@ -131,7 +131,7 @@ if __name__ == '__main__':
 	parser.add_argument("-f", "--folder", required=True, dest="FOLDERPATH",
 						help="Specify source folder")
 	# Set
-	parser.add_argument("-s", "--set", required=True, dest="SETTYPE", help="specify set: either train, dev or test", choices=['train', 'dev', 'test'])
+	parser.add_argument("-s", "--set", required=True, dest="SETTYPE", help="specify set: either train, dev or test", choices=['train', 'dev', 'test', 'val'])
 
 	# Optional Argument: Size of pseudo documents (only relevant for quasar)
 	parser.add_argument("-ds", "--docsize", dest="DOCSIZE", help="specify size of pseudo documents", choices=['long', 'short'], default="short")
