@@ -16,7 +16,6 @@ def process_searchqa(folder, set_type) -> dict:
 		with open(os.path.join(file_path,filename), "r") as f:
 			json_data = json.loads(f.read().replace("\\n", ""))
 			question_dic[json_data["id"]] = {"question":json_data["question"], "answer":json_data["answer"], "contexts":[c["snippet"] for c in json_data["search_results"]]}
-	print(question_dic[475])
 	return question_dic
 
 def process_quasar(folder, set_type, doc_size) -> dict:
