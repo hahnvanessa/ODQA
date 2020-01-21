@@ -15,7 +15,7 @@ def process_searchqa(folder, set_type) -> dict:
 	for filename in os.listdir(file_path):
 		with open(os.path.join(file_path,filename), "r") as f:
 			json_data = json.loads(f.read().replace(r" \n", " "))
-			question_dic[json_data["id"]] = {"question":json_data["question"], "answer":json_data["answer"], "contexts":[c["snippet"] for c in json_data["search_results"]]}
+			question_dic[json_data["id"]] = {"question":json_data["question"], "answer":json_data["answer"], "contexts":[c["snippet"] for c in json_data["search_results"] if c["snippet"] is not None]}
 	return question_dic
 
 def process_quasar(folder, set_type, doc_size) -> dict:
@@ -145,4 +145,4 @@ if __name__ == '__main__':
 	save_to_file(output_path,test_dic,args.TYPE, args.SETTYPE, args.DOCSIZE)
 
 	# Sample call
-	# python3 preprocessing.py -t "searchqa" -f /Users/vanessahahn/Documents/QA/searchQA  -s "train"
+	# python3 preprocessing.py -t "searchqa" -f /Users/vanessahahn/Documents/QA/searchQA  -s "test"
