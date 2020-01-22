@@ -7,6 +7,11 @@ import bcolz
 import pickle
 # Paragraph length script to determine top vocabulary
 import analyse_paragraph_lengths as apl
+# tokenization
+from tokenizers import (ByteLevelBPETokenizer,
+                            BPETokenizer,
+                            SentencePieceBPETokenizer,
+                            BertWordPieceTokenizer)
 
 
 # Note: we use a cased version of Glove
@@ -15,7 +20,7 @@ import analyse_paragraph_lengths as apl
 
 GLOVE_FILE = 'F:\\1QuestionAnswering\\glove\\glove.840B.300d.txt'
 GLOVE_PATH = 'F:\\1QuestionAnswering\\glove\\' # todo: join these with os.join
-DATASET_PATH = "F:\\1QuestionAnswering\\preprocessed_files\\outputs\\searchqa_test.pkl"
+DATASET_PATH = "F:\\1QuestionAnswering\\preprocessed_files\\outputs\\searchqa_test.pkl" #pickled
 
 
 #TEXT_DATA_DIR = os.path.join(BASE_DIR, '20_newsgroup')
@@ -77,11 +82,42 @@ def load_pickled_glove():
     return glove
 
 
+def tokenize_set(DATASET_PATH, type='quasar'):
+    print("Applying tokenization to set: {}".format(type))
+    #todo: check if it is efficient and indexwise ok to store all contexts in a simple list
+    context_list = []
+    assert type in ['quasar', 'searchqa'], 'Wrong type specified. Allowed types are "quasar" and "searchqa'
 
+    # Read in pickled dictionary
+    pickle_in = open(DATASET_PATH, "rb")
+    corpus_dict = pickle.load(pickle_in)
+    # Extract passages from the dictionary
+    for question_id, qv in corpus_dict.items():
+        if type == 'quasar':
+            for _, context in qv['contexts']:
+                # Note this also counts punctation but it should still return an approximate solution
+                context_list.append(context)
+        else:
+            for context in qv['contexts']:
+                context_list.append(context)
+    print("Read in all contexts. Now tokenizing.")
+    # todo: Apply the huggingface tokenizer
+    print(context_list[:2])
+    # Train a vocabulary
+    tokenizer = ByteLevelBPETokenizer()#vocab_size=VOCAB_SIZE)
+    curpath = os.path.abspath(os.curdir)
+    # todo: find a way to put in file as lists of context
+    tokenizer.train(vocab_size=VOCAB_SIZE, files=context_list)
+
+    # todo: Extract vocabulary
+
+    # todo: Store tokenized passages for quasar or searchqa
 
 def make_emedding_matrix(glove_dict, target_vocab):
     '''
-    Returns a matrix of size VOCAB_SIZE*EMBEDDING_DIM
+    Returns a matrix of size VOCAB_SIZE*EMBEDDING_DIM.
+    Target vocabulary are the top n most occuring words
+    in a set.
     :param glove_dict:
     :param target_vocab:
     :return:
@@ -126,7 +162,8 @@ def main(process_glove=False):
     print(emb_mtx.shape)
 
 if __name__ == "__main__":
-    main(process_glove=True)
+    #main(process_glove=True)
+    tokenize_set(DATASET_PATH, type='searchqa')
 
 
 '''
