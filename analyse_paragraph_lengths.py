@@ -38,20 +38,29 @@ def count_length_values(path, type='quasar') -> list:
 
     return length_values, vocab_dict
 
+def recommend_padding_length(length_values):
+    '''
+    Recommended padding length is mean + 0.5 * standard deviation
+    :param length_values:
+    :return:
+    '''
+    return statistics.mean(length_values) + (0.5*statistics.pstdev(length_values))
+
 if __name__ == "__main__":
-    # Quasar length passage
+    # Quasar length passage measures
     length_values_quasar, _ = count_length_values(quasar_path, type='quasar')
     min_val_qst = min(length_values_quasar)
     max_val_qst = max(length_values_quasar)
     mean_val_qst = statistics.mean(length_values_quasar)
     median_val_qst = statistics.median(length_values_quasar)
-    print("Quasar number of words and punctuation per passage: Min length is <{}> max length is <{}> \n\r mean length is <{}> and median length is <{}>.".format(min_val_qst, max_val_qst, mean_val_qst, median_val_qst))
+    print("Quasar number of words and punctuation per passage: Min length is <{}> max length is <{}> \n\r mean length is <{}> and median length is <{}>. Recommend padding length: {}".format(min_val_qst, max_val_qst, mean_val_qst, median_val_qst, recommend_padding_length(length_values_quasar)))
+    # Quasar padding length: 28
 
-    # Searchqa length passage
+    # Searchqa length passage measures
     length_values_searchqa, _ = count_length_values(searchqa_path, type='searchqa')
     min_val_sqa = min(length_values_searchqa)
     max_val_sqa = max(length_values_searchqa)
     mean_val_sqa = statistics.mean(length_values_searchqa)
     median_val_sqa = statistics.median(length_values_searchqa)
-
-    print("Searchqa length of passage (includes punctuation): Min length is <{}> max length is <{}> \n\r mean length is <{}> and median length is <{}>.".format(min_val_sqa, max_val_sqa, mean_val_sqa, median_val_sqa))
+    print("Searchqa length of passage (includes punctuation): Min length is <{}> max length is <{}> \n\r mean length is <{}> and median length is <{}>. Recommend padding length: {}".format(min_val_sqa, max_val_sqa, mean_val_sqa, median_val_sqa, recommend_padding_length(length_values_searchqa)))
+    # Searchqa padding length: 53

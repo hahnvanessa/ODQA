@@ -7,12 +7,15 @@ import bcolz
 import pickle
 # Paragraph length script to determine top vocabulary
 import analyse_paragraph_lengths as apl
+from collections import Counter
 # tokenization
 from tokenizers import (ByteLevelBPETokenizer,
                             BPETokenizer,
                             SentencePieceBPETokenizer,
                             BertWordPieceTokenizer)
-
+import spacy
+# Disable spacy components to speed up tokenization
+nlp = spacy.load('en_core_web_sm',disable=['tagger', 'parser', 'ner', 'print_info']) # let's start with the small model
 
 # Note: we use a cased version of Glove
 # Followed the following approach
@@ -20,15 +23,19 @@ from tokenizers import (ByteLevelBPETokenizer,
 
 GLOVE_FILE = 'F:\\1QuestionAnswering\\glove\\glove.840B.300d.txt'
 GLOVE_PATH = 'F:\\1QuestionAnswering\\glove\\' # todo: join these with os.join
-DATASET_PATH = "F:\\1QuestionAnswering\\preprocessed_files\\outputs\\searchqa_test.pkl" #pickled
-
+# todo: change paths from test to train
+DATASET_PATH_SEARCHQA = "F:\\1QuestionAnswering\\preprocessed_files\\outputs\\searchqa_test.pkl" #pickled
+DATASET_PATH_QUASAR = "F:\\1QuestionAnswering\\preprocessed_files\\outputs\\quasar_test_short.pkl" #pickled
+# Output Pathes
+OUTPUT_PATH_ENCODED = "F:\\1QuestionAnswering\\preprocessed_files\\outputs\\"
 
 #TEXT_DATA_DIR = os.path.join(BASE_DIR, '20_newsgroup')
-MAX_SEQUENCE_LENGTH = 100 # todo: check out typical length of candiates to decide on this, not specified in paper
-VOCAB_SIZE = 1000 # todo: decide on vocab size, not specified by paper
-MAX_GLOVE_RETRIEVAL_SIZE = 1000 #only used for debugging, so we do not crate the full 2.4m entries during traing
+MAX_SEQUENCE_LENGTH = 54 # should approximately be the mean sentence length+ 0.5std, searchqa has highest with appr. 54
+VOCAB_SIZE = 1000 # todo: decide on vocab size, not specified by paper, good value might be 20000
+MAX_GLOVE_RETRIEVAL_SIZE = 1000 #todo: only used for debugging, so we do not crate the full 2.4m entries during traing
 EMBEDDING_DIM = 300 # 300 dimensions as specified by paper
-
+PAD_IDENTIFIER = '<PAD>'
+UNKNOWN_IDENTIFIER = '<UNK>'
 
 def build_glove_dict()->dict:
     '''
@@ -82,36 +89,51 @@ def load_pickled_glove():
     return glove
 
 
+def tokenize_context(context) -> list:
+    '''
+    Tokenizes the given context by using spacy tokenizer.
+    :param context:
+    :return:
+    '''
+    # Deactivate spacy components to speed up the process
+    # todo: switch to spacy tokenizer (takes longer but is more accurate)
+    return context.split() #[token.text for token in nlp(context)]
+
+
 def tokenize_set(DATASET_PATH, type='quasar'):
     print("Applying tokenization to set: {}".format(type))
-    #todo: check if it is efficient and indexwise ok to store all contexts in a simple list
-    context_list = []
+    #todo: check if it is efficient and indexwise ok to store all contexts in a simple list, alternative: array
     assert type in ['quasar', 'searchqa'], 'Wrong type specified. Allowed types are "quasar" and "searchqa'
+    # Count all tokens
+    token_count = Counter()
 
     # Read in pickled dictionary
     pickle_in = open(DATASET_PATH, "rb")
     corpus_dict = pickle.load(pickle_in)
+    i = 0
     # Extract passages from the dictionary
     for question_id, qv in corpus_dict.items():
+        corpus_dict[question_id]['tokenized_contexts'] = []
         if type == 'quasar':
             for _, context in qv['contexts']:
                 # Note this also counts punctation but it should still return an approximate solution
-                context_list.append(context)
+                tokenized_context = tokenize_context(context)
+                corpus_dict[question_id]['tokenized_contexts'].append(tokenized_context)
+                token_count.update(tokenized_context)
         else:
             for context in qv['contexts']:
-                context_list.append(context)
-    print("Read in all contexts. Now tokenizing.")
-    # todo: Apply the huggingface tokenizer
-    print(context_list[:2])
-    # Train a vocabulary
-    tokenizer = ByteLevelBPETokenizer()#vocab_size=VOCAB_SIZE)
-    curpath = os.path.abspath(os.curdir)
-    # todo: find a way to put in file as lists of context
-    tokenizer.train(vocab_size=VOCAB_SIZE, files=context_list)
+                if context:
+                    tokenized_context = tokenize_context(context)
+                    corpus_dict[question_id]['tokenized_contexts'].append(tokenized_context)
+                    token_count.update(tokenized_context)
 
-    # todo: Extract vocabulary
+        # Delete untokenized contexts to save memory
+        del corpus_dict[question_id]['contexts']
 
-    # todo: Store tokenized passages for quasar or searchqa
+        i += 1
+        if i%1000 == 0:
+            print('Tokenized {} of {} questions in total for set <{}>'.format(i, len(corpus_dict), type))
+    return corpus_dict, token_count
 
 def make_emedding_matrix(glove_dict, target_vocab):
     '''
@@ -124,12 +146,26 @@ def make_emedding_matrix(glove_dict, target_vocab):
     '''
     print("making embedding matrix.")
     matrix_len = len(target_vocab)
-    weights_matrix = np.zeros((matrix_len, EMBEDDING_DIM))
+    # Weight matrix has vocabulary plus the entries for padding and unknown
+    weights_matrix = np.zeros((matrix_len+2, EMBEDDING_DIM))
     idx_2_word = {}
     word_2_idx = {}
     words_found = 0
 
-    for i, word in enumerate(target_vocab):
+
+    # Add padding symbol
+    idx_2_word[0] = PAD_IDENTIFIER
+    word_2_idx[PAD_IDENTIFIER]  = 0
+    pad_vector = np.zeros(shape=(EMBEDDING_DIM,))
+    weights_matrix[0] = pad_vector
+    # Add unknown word (word that does not appear in the top vocabulary)
+    idx_2_word[1] = UNKNOWN_IDENTIFIER
+    word_2_idx[UNKNOWN_IDENTIFIER] = 1
+    unknown_vector = np.random.normal(scale=0.6, size=(EMBEDDING_DIM,))
+    weights_matrix[1] = unknown_vector
+
+
+    for i, word in enumerate(target_vocab, start = 2):
         try:
             weights_matrix[i] = glove_dict[word]
             words_found += 1
@@ -142,32 +178,107 @@ def make_emedding_matrix(glove_dict, target_vocab):
     print('{} of the {} words in the quasar/searchqa set were found in the glove set'.format(words_found, matrix_len))
     return weights_matrix, idx_2_word, word_2_idx
 
+def encode_pad_context(tokenized_context, word_2_idx):
+    '''
+    Given a tokenized context, pads or trunctuates the context, applies index on tokens
+    and returns a numpy array.
+    :param tokenized_context:
+    :param word_2_idx:
+    :return:
+    '''
+    encoded_context = []
+    # Pad context or trunctuate context
+    tokenized_context.extend([PAD_IDENTIFIER] * MAX_SEQUENCE_LENGTH) # always add so min size is always MAX_SEQUENCE_LENGTH + 1
+    tokenized_context = tokenized_context[:MAX_SEQUENCE_LENGTH]
+    # Index words, identify unkown ones
+    for t in tokenized_context:
+        # If word in top vocabulary or is a padding token
+        if t in word_2_idx:
+            encoded_context.append(word_2_idx[t])
+        else:
+            encoded_context.append(word_2_idx[UNKNOWN_IDENTIFIER])
+    return np.array(encoded_context)
+
+def encode_corpus_dict(corpus_dict, word_2_idx) -> dict:
+    '''
+    Applies encoding to a corpus dict that already contains tokenized contexts.
+    Adds a list of encoded context to the particular question_id dict.
+    :param corpus_dict: Corpus dict of either searchqa or quasar
+    :param word_2_idx: Mapping of words to indexes
+    :return:
+    '''
+    i = 0
+    for question_id, qv in corpus_dict.items():
+        corpus_dict[question_id]['encoded_contexts'] = []
+        for tokenized_context in qv['tokenized_contexts']:
+            encoded_context = encode_pad_context(tokenized_context,word_2_idx)
+            corpus_dict[question_id]['encoded_contexts'].append(encoded_context)
+        i += 1
+        if i % 1000 == 0:
+            print('Encoded {} of {} questions in total'.format(i, len(corpus_dict)))
+        # Delete tokenized entries to save memory
+        del corpus_dict[question_id]['tokenized_contexts']
+
+    return corpus_dict
 
 def main(process_glove=False):
+    # Specify whether the original Glove file should be processed or a
+    # already pickled version of Glove should be loaded
     if process_glove:
         glove = build_glove_dict()
     else:
         glove = load_pickled_glove()
-    pass
 
-    # Retrieve most used vocabulary words from the dataset file
-    _, vocabulary = apl.count_length_values(DATASET_PATH, type='searchqa')
-    # todo: note that this vocabulary was simply split with the split function
-    # a tokenizer function would be much nicer
-    # todo: we need some function that tokenizes all contexts properly, gives them
-    # while doing that it should track how often each vocabulary item appears
-    # the ones appaering most often will be the top_vocabulary
-    top_vocabulary = [x[0] for x in vocabulary.most_common(VOCAB_SIZE)]
+    # Tokenization
+    # 1. Retrieve most used vocabulary words from searchqa and quasar
+    # 2. Tokenize contexts but do not apply padding yet, tokenized contexts stored in corpus_dict
+    searchqa_tok_corpus_dict, searchqa_token_count = tokenize_set(DATASET_PATH_SEARCHQA, type='searchqa')
+    quasar_tok_corpus_dict, quasar_token_count = tokenize_set(DATASET_PATH_QUASAR, type='quasar')
+    # 3. Combine the top vocabularies from both sets
+    total_token_count = searchqa_token_count + quasar_token_count
+    top_vocabulary = [x[0] for x in total_token_count.most_common(VOCAB_SIZE)]
+    del quasar_token_count # save memory
+    del searchqa_token_count # save memory
+
+    # Create an embedding matrix
     emb_mtx, idx_2_word, word_2_idx = make_emedding_matrix(glove_dict=glove, target_vocab=top_vocabulary)
+
+    # Test encoding
+    print(encode_pad_context(['hello', 'how', 'are', 'you'], word_2_idx))
     print(emb_mtx.shape)
 
+    # Encode corpus dict, delete corpus dicts
+    searchqa_enc_corpus_dict = encode_corpus_dict(searchqa_tok_corpus_dict, word_2_idx)
+    del searchqa_tok_corpus_dict # to avoid memory errors
+    quasar_enc_corpus_dict = encode_corpus_dict(quasar_tok_corpus_dict, word_2_idx)
+    del quasar_tok_corpus_dict
+
+    print('Encoded all corpus dictionaries.')
+    return searchqa_enc_corpus_dict, quasar_enc_corpus_dict, emb_mtx, idx_2_word, word_2_idx
+
 if __name__ == "__main__":
-    #main(process_glove=True)
-    tokenize_set(DATASET_PATH, type='searchqa')
+    searchqa_enc_corpus_dic, quasar_enc_corpus_dict, emb_mtx, idx_2_word, word_2_idx = main(process_glove=False)
 
+    # Pickle:
+    # Encoded SearchQA dict
+    with open(os.path.join(OUTPUT_PATH_ENCODED, 'encoded_searchqa_dict.pkl'), 'wb') as fo:
+        pickle.dump(searchqa_enc_corpus_dic, fo)
+    # Encoded Quasar dict
+    with open(os.path.join(OUTPUT_PATH_ENCODED, 'encoded_quasar_dict.pkl'), 'wb') as fo:
+        pickle.dump(quasar_enc_corpus_dict, fo)
+    # Embedding Matrix
+    with open(os.path.join(OUTPUT_PATH_ENCODED, 'embedding.pkl'), 'wb') as fo:
+        pickle.dump(emb_mtx, fo)
+    # Index to Word dict
+    with open(os.path.join(OUTPUT_PATH_ENCODED, 'idx_2_word_dict.pkl'), 'wb') as fo:
+        pickle.dump(idx_2_word, fo)
+    # Word to Index dict
+    with open(os.path.join(OUTPUT_PATH_ENCODED, 'word_2_idx_dict.pkl'), 'wb') as fo:
+        pickle.dump(word_2_idx, fo)
 
+    print('Pickled and saved all files.')
 '''
-pytorch embedding layer
+Notes on pytorch embedding layer    
 def create_emb_layer(weights_matrix, non_trainable=False):
     num_embeddings, embedding_dim = weights_matrix.size()
     emb_layer = nn.Embedding(num_embeddings, embedding_dim)
