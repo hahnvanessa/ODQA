@@ -17,20 +17,21 @@ import spacy
 # Disable spacy components to speed up tokenization
 nlp = spacy.load('en_core_web_sm',disable=['tagger', 'parser', 'ner', 'print_info']) # let's start with the small model
 
-
 # Note: we use a cased version of Glove
 # Followed the following approach
 # https://medium.com/@martinpella/how-to-use-pre-trained-word-embeddings-in-pytorch-71ca59249f76
 
 GLOVE_FILE = 'F:\\1QuestionAnswering\\glove\\glove.840B.300d.txt'
 GLOVE_PATH = 'F:\\1QuestionAnswering\\glove\\' # todo: join these with os.join
-# todo: change from test to train
+# todo: change paths from test to train
 DATASET_PATH_SEARCHQA = "F:\\1QuestionAnswering\\preprocessed_files\\outputs\\searchqa_test.pkl" #pickled
 DATASET_PATH_QUASAR = "F:\\1QuestionAnswering\\preprocessed_files\\outputs\\quasar_test_short.pkl" #pickled
+# Output Pathes
+OUTPUT_PATH_ENCODED = "F:\\1QuestionAnswering\\preprocessed_files\\outputs\\"
 
 #TEXT_DATA_DIR = os.path.join(BASE_DIR, '20_newsgroup')
 MAX_SEQUENCE_LENGTH = 54 # should approximately be the mean sentence length+ 0.5std, searchqa has highest with appr. 54
-VOCAB_SIZE = 1000 # todo: decide on vocab size, not specified by paper
+VOCAB_SIZE = 1000 # todo: decide on vocab size, not specified by paper, good value might be 20000
 MAX_GLOVE_RETRIEVAL_SIZE = 1000 #todo: only used for debugging, so we do not crate the full 2.4m entries during traing
 EMBEDDING_DIM = 300 # 300 dimensions as specified by paper
 PAD_IDENTIFIER = '<PAD>'
@@ -125,9 +126,12 @@ def tokenize_set(DATASET_PATH, type='quasar'):
                     tokenized_context = tokenize_context(context)
                     corpus_dict[question_id]['tokenized_contexts'].append(tokenized_context)
                     token_count.update(tokenized_context)
+
+        # Delete untokenized contexts to save memory
+        del corpus_dict[question_id]['contexts']
+
         i += 1
-        if i%1000\
-                == 0:
+        if i%1000 == 0:
             print('Tokenized {} of {} questions in total for set <{}>'.format(i, len(corpus_dict), type))
     return corpus_dict, token_count
 
@@ -233,6 +237,9 @@ def main(process_glove=False):
     # 3. Combine the top vocabularies from both sets
     total_token_count = searchqa_token_count + quasar_token_count
     top_vocabulary = [x[0] for x in total_token_count.most_common(VOCAB_SIZE)]
+    del quasar_token_count # save memory
+    del searchqa_token_count # save memory
+
     # Create an embedding matrix
     emb_mtx, idx_2_word, word_2_idx = make_emedding_matrix(glove_dict=glove, target_vocab=top_vocabulary)
 
@@ -240,17 +247,38 @@ def main(process_glove=False):
     print(encode_pad_context(['hello', 'how', 'are', 'you'], word_2_idx))
     print(emb_mtx.shape)
 
-    # Encode corpus dict
+    # Encode corpus dict, delete corpus dicts
     searchqa_enc_corpus_dict = encode_corpus_dict(searchqa_tok_corpus_dict, word_2_idx)
+    del searchqa_tok_corpus_dict # to avoid memory errors
     quasar_enc_corpus_dict = encode_corpus_dict(quasar_tok_corpus_dict, word_2_idx)
-    return searchqa_tok_corpus_dict, quasar_enc_corpus_dict, emb_mtx, idx_2_word, word_2_idx
+    del quasar_tok_corpus_dict
+
+    print('Encoded all corpus dictionaries.')
+    return searchqa_enc_corpus_dict, quasar_enc_corpus_dict, emb_mtx, idx_2_word, word_2_idx
 
 if __name__ == "__main__":
-    searchqa_tok_corpus_dict, quasar_enc_corpus_dict, emb_mtx, idx_2_word, word_2_idx = main(process_glove=False)
-    print(searchqa_tok_corpus_dict)
+    searchqa_enc_corpus_dic, quasar_enc_corpus_dict, emb_mtx, idx_2_word, word_2_idx = main(process_glove=False)
 
+    # Pickle:
+    # Encoded SearchQA dict
+    with open(os.path.join(OUTPUT_PATH_ENCODED, 'encoded_searchqa_dict.pkl'), 'wb') as fo:
+        pickle.dump(searchqa_enc_corpus_dic, fo)
+    # Encoded Quasar dict
+    with open(os.path.join(OUTPUT_PATH_ENCODED, 'encoded_quasar_dict.pkl'), 'wb') as fo:
+        pickle.dump(quasar_enc_corpus_dict, fo)
+    # Embedding Matrix
+    with open(os.path.join(OUTPUT_PATH_ENCODED, 'embedding.pkl'), 'wb') as fo:
+        pickle.dump(emb_mtx, fo)
+    # Index to Word dict
+    with open(os.path.join(OUTPUT_PATH_ENCODED, 'idx_2_word_dict.pkl'), 'wb') as fo:
+        pickle.dump(idx_2_word, fo)
+    # Word to Index dict
+    with open(os.path.join(OUTPUT_PATH_ENCODED, 'word_2_idx_dict.pkl'), 'wb') as fo:
+        pickle.dump(word_2_idx, fo)
+
+    print('Pickled and saved all files.')
 '''
-pytorch embedding layer
+Notes on pytorch embedding layer    
 def create_emb_layer(weights_matrix, non_trainable=False):
     num_embeddings, embedding_dim = weights_matrix.size()
     emb_layer = nn.Embedding(num_embeddings, embedding_dim)
