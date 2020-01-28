@@ -10,24 +10,22 @@ class BiLSTM(nn.Module):
     	self.embedding = #insert glove embedding matrix
     	self.dropout = nn.Dropout(p=dropout) #try without dropout too and with different p
     	self.bilstm = nn.LSTM(input_size=embedding_dim, hidden_size=hidden_dim, dropout=self.dropout, bidirectional=True)
-    	#self.hidden2label?
 
-    	self.hidden = self.init_hidden()
     	self.hidden2label = nn.Linear(hidden_dim, ?) #define second dimension - target length k?
 
-
-    def init_hidden(self):
-    	#something like this
-    	 return (torch.randn(2, 1, self.hidden_dim // 2),
-                torch.randn(2, 1, self.hidden_dim // 2))
-
-    def forward(self, sentence):
+    def forward(self, sentence, attention=False):
     	x = self.embedding(sentence)
-    	lstm_out, self.hidden = self.lstm(x)
-    	y = self.hidden2label(lstm_out)
-    	return y
+    	lstm_out, (h_n, c_n) = self.bilstm(x) #how to input question AND paragraphs?
+        #h_n = tensor containing the hidden state for t = seq_len, c_n = tensor containing the cell state for t = seq_len
+    	#y = self.hidden2label(lstm_out)
+    	return lstm_out, (h_n, c_n)
+
+    def attention(self):
+    	pass
 
     def _get_lstm_features(self, sentence):
     	#this function to return the last hidden layer as contextual representation of the sentence?
     	#also to return more features when we have to implemented the advanced representations later?
-    	pass
+    	pass   
+    #create another def attention to use in forward function
+    #create main.py to loop over the data points and feed into BILSTM
