@@ -29,8 +29,7 @@ DATASET_PATH_QUASAR = "F:\\1QuestionAnswering\\preprocessed_files\\outputs\\quas
 # Output Pathes
 OUTPUT_PATH_ENCODED = "F:\\1QuestionAnswering\\preprocessed_files\\outputs\\"
 
-#TEXT_DATA_DIR = os.path.join(BASE_DIR, '20_newsgroup')
-MAX_SEQUENCE_LENGTH = 54 # should approximately be the mean sentence length+ 0.5std, searchqa has highest with appr. 54
+MAX_SEQUENCE_LENGTH = 54 # should approximately be the mean sentence length+ 0.5std, searchqa has highest seq. length with appr. 54
 VOCAB_SIZE = 1000 # todo: decide on vocab size, not specified by paper, good value might be 20000
 MAX_GLOVE_RETRIEVAL_SIZE = 1000 #todo: only used for debugging, so we do not crate the full 2.4m entries during traing
 EMBEDDING_DIM = 300 # 300 dimensions as specified by paper
@@ -46,24 +45,26 @@ def build_glove_dict()->dict:
     # List of words that appear in the Glove file
     words = []
     # Index
-    start_index = 0
+    idx = 0
     # Word to index mapping
     word2idx = {}
     # This will be the file where we store our vectors, words and indexes are stored in separate
     vectors = bcolz.carray(np.zeros(1), rootdir=f'{GLOVE_PATH}\\840B.300d.dat', mode='w')
 
-    with open(GLOVE_FILE, 'rb') as f:
+    with open(GLOVE_FILE, 'r', errors='ignore', encoding='utf8') as f:
         # todo: stop after vocab size is reached
-        for idx in range(start_index, MAX_GLOVE_RETRIEVAL_SIZE):
-            line = next(f).decode().split()
-            word = line[0]
+        #for idx in range(start_index, MAX_GLOVE_RETRIEVAL_SIZE): # use this for testing
+            #line = next(f).decode().split()
+        for line in f:
+            line = line.strip().split()
+            word = " ".join(line[:-EMBEDDING_DIM])
             words.append(word)
             word2idx[word] = idx
-            vect = np.array(line[1:]).astype(np.float)
+            vect = np.array(line[-EMBEDDING_DIM:]).astype(np.float)
             vectors.append(vect)
             if idx%10000 == 0 and idx > 0:
-                print("Read in {} glove vectors.".format(idx))
-
+                print("Read in {} glove vectors of about 2,200,000 in total.".format(idx))
+            idx += 1 # comment out for testing
 
     vectors = bcolz.carray(vectors[1:].reshape((-1, EMBEDDING_DIM)), rootdir=f'{GLOVE_PATH}\\840B.300d.dat', mode='w')
     # Write vectors to disk
@@ -97,7 +98,7 @@ def tokenize_context(context) -> list:
     '''
     # Deactivate spacy components to speed up the process
     # todo: switch to spacy tokenizer (takes longer but is more accurate)
-    return context.split() #[token.text for token in nlp(context)]
+    return [token.text for token in nlp(context)]
 
 
 def tokenize_set(DATASET_PATH, type='quasar'):
@@ -120,12 +121,16 @@ def tokenize_set(DATASET_PATH, type='quasar'):
                 tokenized_context = tokenize_context(context)
                 corpus_dict[question_id]['tokenized_contexts'].append(tokenized_context)
                 token_count.update(tokenized_context)
+
         else:
             for context in qv['contexts']:
                 if context:
                     tokenized_context = tokenize_context(context)
                     corpus_dict[question_id]['tokenized_contexts'].append(tokenized_context)
                     token_count.update(tokenized_context)
+        # Tokenize question as well
+        # corpus_dict[question_id]['tokenized_question'] = tokenize_context(question)
+        # token_count.update(corpus_dict[question_id]['tokenized_question'])
 
         # Delete untokenized contexts to save memory
         del corpus_dict[question_id]['contexts']
@@ -171,8 +176,7 @@ def make_emedding_matrix(glove_dict, target_vocab):
             words_found += 1
         # If the glove dictionary does not not contain the word, add random vector
         except KeyError:
-            #todo: figure out what scale does
-            weights_matrix[i] = np.random.normal(scale=0.6, size=(EMBEDDING_DIM, ))
+            weights_matrix[i] = np.random.normal(scale=0.6, size=(EMBEDDING_DIM, )) # scale refers to standard deviation
         idx_2_word[i] = word
         word_2_idx[word] = i
     print('{} of the {} words in the quasar/searchqa set were found in the glove set'.format(words_found, matrix_len))
@@ -213,6 +217,10 @@ def encode_corpus_dict(corpus_dict, word_2_idx) -> dict:
         for tokenized_context in qv['tokenized_contexts']:
             encoded_context = encode_pad_context(tokenized_context,word_2_idx)
             corpus_dict[question_id]['encoded_contexts'].append(encoded_context)
+        # Encode question
+        # encoded_question = corpus_dict[question_id]['tokenized_question']
+        # corpus_dict[question_id]['encoded_question'] = encoded_question
+        # del corpus_dict[question_id]['tokenized_question']
         i += 1
         if i % 1000 == 0:
             print('Encoded {} of {} questions in total'.format(i, len(corpus_dict)))
@@ -257,7 +265,7 @@ def main(process_glove=False):
     return searchqa_enc_corpus_dict, quasar_enc_corpus_dict, emb_mtx, idx_2_word, word_2_idx
 
 if __name__ == "__main__":
-    searchqa_enc_corpus_dic, quasar_enc_corpus_dict, emb_mtx, idx_2_word, word_2_idx = main(process_glove=False)
+    searchqa_enc_corpus_dic, quasar_enc_corpus_dict, emb_mtx, idx_2_word, word_2_idx = main(process_glove=True)
 
     # Pickle:
     # Encoded SearchQA dict
