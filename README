@@ -1,7 +1,7 @@
 Open Domain Question Answering System
 with Joint Training using Reinforcement Learning
 by Katya Saveleva, Fabian Goessl and Vanessa Hahn
-for the course Advances in Question Answering, WS 19/20, UDS
+for the course Advances in Question Answering, WS 19/20, Saarland University
 
 Data:
 SearchQA: https://github.com/nyu-dl/dl4ir-searchqA
