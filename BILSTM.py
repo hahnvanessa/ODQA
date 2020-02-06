@@ -2,18 +2,18 @@ import torch
 from torch import nn
 
 class BiLSTM(nn.Module):
-    def __init__(self, vocab_size, embedding_dim, hidden_dim, batch_size, dropout=0.2):
+    def __init__(self, embedding_matrix, embedding_dim, hidden_dim, batch_size, dropout=0.2):
     	#what about cuda? where do we need to specify GPU?
     	#might need to add more parameters as we will have more features in later stages - advanced representations
-    	self.vocab_size = vocab_size
+    	self.embeddings = embedding_matrix
     	self.embedding_dim = embedding_dim
     	self.hidden_dim = hidden_dim
     	self.batch_size = batch_size
-    	self.embedding = #insert glove embedding matrix
+    	self.embedding = nn.Embedding.from_pretrained(torch.FloatTensor(self.embeddings))
     	self.dropout = nn.Dropout(p=dropout) #try without dropout too and with different p
     	self.bilstm = nn.LSTM(input_size=embedding_dim, hidden_size=hidden_dim, dropout=self.dropout, bidirectional=True)
 
-    	self.hidden2label = nn.Linear(hidden_dim, ?) #define second dimension - target length k?
+    	#self.hidden2label = nn.Linear(hidden_dim, ?) #define second dimension - target length k?
 
     def forward(self, sentence, attention=False):
     	x = self.embedding(sentence)
@@ -34,10 +34,6 @@ class BiLSTM(nn.Module):
         #is h_tP already H_P?
     	H_P = h_tP # for now 
         return H_P
-
-    def _get_lstm_features(self, sentence):
-    	#this function to return the last hidden layer as contextual representation of the sentence?
-    	#also to return more features when we have to implemented the advanced representations later?
-    	pass   
+ 
     #create another def attention to use in forward function
     #create main.py to loop over the data points and feed into BILSTM
