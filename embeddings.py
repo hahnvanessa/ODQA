@@ -120,12 +120,12 @@ def tokenize_set(DATASET_PATH, type='quasar') -> Tuple[dict, int]:
                     tokenized_context = tokenize_context(context)
                     corpus_dict[question_id]['tokenized_contexts'].append(tokenized_context)
                     token_count.update(tokenized_context)
-        # Tokenize question as well
+        # Tokenize question
         corpus_dict[question_id]['tokenized_question'] = tokenize_context(qv['question'])
         token_count.update(corpus_dict[question_id]['tokenized_question'])
-
-        # Delete untokenized contexts to save memory
-        del corpus_dict[question_id]['contexts']
+        # Tokenize answer
+        corpus_dict[question_id]['tokenized_answer'] = tokenize_context(qv['answer'])
+        token_count.update(corpus_dict[question_id]['tokenized_answer'])
 
         i += 1
         if i % 1000 == 0:
@@ -215,6 +215,10 @@ def encode_corpus_dict(corpus_dict, word_2_idx) -> dict:
         encoded_question = encode_pad_context(corpus_dict[question_id]['tokenized_question'], word_2_idx)
         corpus_dict[question_id]['encoded_question'] = encoded_question
         del corpus_dict[question_id]['tokenized_question']
+        # Encode answer
+        encoded_answer = encode_pad_context(corpus_dict[question_id]['tokenized_answer'], word_2_idx)
+        corpus_dict[question_id]['encoded_answer'] = encoded_question
+        del corpus_dict[question_id]['tokenized_answer']
         i += 1
         if i % 1000 == 0:
             print('Encoded {} of {} questions in total'.format(i, len(corpus_dict)))
@@ -318,7 +322,7 @@ def main(process_glove=False, tokenize=False, encode=False):
 
         # Save Encoded SearchQA dict
         with open(os.path.join(OUTPUT_PATH_ENCODED, 'encoded_searchqa_dict.pkl'), 'wb') as fo:
-            pickle.dump(searchqa_enc_corpus_dic, fo)
+            pickle.dump(searchqa_enc_corpus_dict, fo)
         # Save Encoded Quasar dict
         with open(os.path.join(OUTPUT_PATH_ENCODED, 'encoded_quasar_dict.pkl'), 'wb') as fo:
             pickle.dump(quasar_enc_corpus_dict, fo)
