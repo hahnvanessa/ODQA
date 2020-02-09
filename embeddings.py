@@ -14,6 +14,8 @@ nlp = spacy.load('en_core_web_sm',
 # todo: multiprocessing
 # Handle the file paths
 from pathlib import Path
+# Typing
+from typing import Tuple
 
 dirpath = os.getcwd()
 GLOVE_FILE = Path("/".join([dirpath, 'glove.840B.300d.txt']))
@@ -22,6 +24,9 @@ GLOVE_PATH = Path(dirpath)
 # Filepaths to files that will be used to create the embedding matrix
 DATASET_PATH_SEARCHQA = Path("/".join([dirpath, 'outputs', 'searchqa_test.pkl']))  # pickled
 DATASET_PATH_QUASAR = Path("/".join([dirpath, 'outputs', 'quasar_test_short.pkl']))  # pickled
+# Toy files
+DATASET_PATH_TOY_QUASAR =  Path("/".join([dirpath, 'outputs', 'searchqa_test.pkl']))#Path("/".join([dirpath, 'outputs', 'quasar_toy.pkl']))  # pickled
+DATASET_PATH_TOY_SEARCHQA = Path("/".join([dirpath, 'outputs', 'quasar_test_short.pkl'])) #Path("/".join([dirpath, 'outputs', 'searchqa_toy.pkl']))  # pickled
 # Output Pathes
 OUTPUT_PATH_ENCODED = Path("/".join([dirpath, 'outputs']))
 
@@ -88,7 +93,7 @@ def tokenize_context(context) -> list:
     return [token.text for token in nlp(context)]
 
 
-def tokenize_set(DATASET_PATH, type='quasar'):
+def tokenize_set(DATASET_PATH, type='quasar') -> Tuple[dict, int]:
     print("Applying tokenization to set: {}".format(type))
     # todo: check if it is efficient and indexwise ok to store all contexts in a simple list, alternative: array
     assert type in ['quasar', 'searchqa'], 'Wrong type specified. Allowed types are "quasar" and "searchqa'
@@ -218,7 +223,7 @@ def encode_corpus_dict(corpus_dict, word_2_idx) -> dict:
 
     return corpus_dict
 
-def encode_untokenized_single_file(filepath, type='quasar', word_2_idx):
+def encode_untokenized_file(DATASET_PATH, word_2_idx, type='quasar'):
     '''
     Tokenizes and encodes a single file. This can be used to encode val, test or toy files.
     :param filepath:
@@ -226,7 +231,14 @@ def encode_untokenized_single_file(filepath, type='quasar', word_2_idx):
     :param word_2_idx:
     :return:
     '''
-    
+    assert type in ['quasar', 'searchqa'], 'Wrong type specified. Allowed types are "quasar" and "searchqa'
+
+    # Tokenize
+    tok_corpus_dict, _ = tokenize_set(DATASET_PATH, type=type)
+    # Encode
+    enc_corpus_dict = encode_corpus_dict(tok_corpus_dict, word_2_idx)
+    return enc_corpus_dict
+
 
 def load_matrix_and_mapping_dictionaries():
     '''
@@ -240,6 +252,16 @@ def load_matrix_and_mapping_dictionaries():
 
 
 def main(process_glove=False, tokenize=False, encode=False):
+    '''
+    Performs processing of the glove file, tokenization of the (large) training corpora and
+    building of the embedding matrix and the word/indx mapping dictionaries. If an attribute
+    is set to False it will load preproccessed files instead.
+    Returns the encoded corpora, the embedding matrix and the mappings.
+    :param process_glove:
+    :param tokenize:
+    :param encode:
+    :return:
+    '''
     # Specify whether the original Glove file should be processed or a
     # already pickled dictionary version of Glove should be loaded
     if process_glove:
@@ -311,9 +333,12 @@ def main(process_glove=False, tokenize=False, encode=False):
 
 
 if __name__ == "__main__":
-    searchqa_enc_corpus_dic, quasar_enc_corpus_dict, emb_mtx, idx_2_word, word_2_idx = main(process_glove=False, tokenize=True)
-
-
+    # Run main to create encoded training files, embedding matrix, word/index mappings
+    searchqa_enc_corpus_dic, quasar_enc_corpus_dict, emb_mtx, idx_2_word, word_2_idx = main(process_glove=False, tokenize=True, encode=True)
+    # Encode all other files that need to be encoded
+    encode_untokenized_file(DATASET_PATH_TOY_QUASAR, word_2_idx, type='quasar')
+    encode_untokenized_file(DATASET_PATH_TOY_SEARCHQA, word_2_idx, type='searchqa')
+    # todo: encode test and val sets of quasar and searchqa
 '''
 #Notes on pytorch embedding layer
 def create_emb_layer(weights_matrix, non_trainable=False):
