@@ -25,9 +25,9 @@ GLOVE_PATH = Path(dirpath)
 # Filepaths to files that will be used to create the embedding matrix
 DATASET_PATH_SEARCHQA = Path("/".join([dirpath, 'outputs', 'searchqa_test.pkl']))  # pickled
 DATASET_PATH_QUASAR = Path("/".join([dirpath, 'outputs', 'quasar_test_short.pkl']))  # pickled
-# Toy files
-DATASET_PATH_TOY_QUASAR =  Path("/".join([dirpath, 'outputs', 'searchqa_test.pkl']))#Path("/".join([dirpath, 'outputs', 'quasar_toy.pkl']))  # pickled
-DATASET_PATH_TOY_SEARCHQA = Path("/".join([dirpath, 'outputs', 'quasar_test_short.pkl'])) #Path("/".join([dirpath, 'outputs', 'searchqa_toy.pkl']))  # pickled
+#todo: Include file paths for all test, val and toy sets
+DATASET_PATH_TOY_QUASAR =  Path("/".join([dirpath, 'outputs', 'quasar_test_short.pkl']))#Path("/".join([dirpath, 'outputs', 'quasar_toy.pkl']))  # pickled
+DATASET_PATH_TOY_SEARCHQA = Path("/".join([dirpath, 'outputs', 'searchqa_test.pkl'])) #Path("/".join([dirpath, 'outputs', 'searchqa_toy.pkl']))  # pickled
 # Output Pathes
 OUTPUT_PATH_ENCODED = Path("/".join([dirpath, 'outputs']))
 
@@ -341,17 +341,7 @@ if __name__ == "__main__":
     # Run main to create encoded training files, embedding matrix, word/index mappings
     searchqa_enc_corpus_dic, quasar_enc_corpus_dict, emb_mtx, idx_2_word, word_2_idx = main(process_glove=False, tokenize=True, encode=True)
     # Encode all other files that need to be encoded
-    encode_untokenized_file(DATASET_PATH_TOY_QUASAR, word_2_idx, type='quasar')
-    encode_untokenized_file(DATASET_PATH_TOY_SEARCHQA, word_2_idx, type='searchqa')
     # todo: encode test and val sets of quasar and searchqa
-'''
-#Notes on pytorch embedding layer
-def create_emb_layer(weights_matrix, non_trainable=False):
-    num_embeddings, embedding_dim = weights_matrix.size()
-    emb_layer = nn.Embedding(num_embeddings, embedding_dim)
-    emb_layer.load_state_dict({'weight': weights_matrix})
-    if non_trainable:
-        emb_layer.weight.requires_grad = False
+    #encode_untokenized_file(DATASET_PATH_TOY_QUASAR, word_2_idx, type='quasar')
+    #encode_untokenized_file(DATASET_PATH_TOY_SEARCHQA, word_2_idx, type='searchqa')
 
-    return emb_layer, num_embeddings, embedding_dim 
-'''
