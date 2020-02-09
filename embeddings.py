@@ -7,6 +7,7 @@ import bcolz
 import pickle
 from collections import Counter
 import spacy
+import torch
 
 # Disable spacy components to speed up tokenization
 nlp = spacy.load('en_core_web_sm',
@@ -194,7 +195,7 @@ def encode_pad_context(tokenized_context, word_2_idx):
             encoded_context.append(word_2_idx[t])
         else:
             encoded_context.append(word_2_idx[UNKNOWN_IDENTIFIER])
-    return np.array(encoded_context)
+    return torch.FloatTensor(encoded_context)
 
 
 def encode_corpus_dict(corpus_dict, word_2_idx) -> dict:
