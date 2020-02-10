@@ -195,7 +195,8 @@ def encode_pad_context(tokenized_context, word_2_idx):
             encoded_context.append(word_2_idx[t])
         else:
             encoded_context.append(word_2_idx[UNKNOWN_IDENTIFIER])
-    return torch.FloatTensor(encoded_context)
+    # todo: Change this back to a different format
+    return np.array(encoded_context)
 
 
 def encode_corpus_dict(corpus_dict, word_2_idx) -> dict:
