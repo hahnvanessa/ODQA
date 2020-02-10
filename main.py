@@ -1,6 +1,6 @@
-
 from argparse import ArgumentParser
 import BILSTM
+import pickle
 import embeddings
 
 
@@ -16,20 +16,23 @@ def get_file_paths(data_dir):
     return file_names
 
 
-if __name__ == '__main__':
+def main(embedding_matrix, encoded_corpora):
+    '''
+    Iterates through all given corpus files and forwards the encoded contexts and questions
+    through the BILSTMs.
+    :param embedding_matrix:
+    :param encoded_corpora:
+    :return:
+    '''
 
-    parser = ArgumentParser(
-        description='Main ODQA script')
-    parser.add_argument(
-        'embeddings', help='Path to the pkl file')
-    parser.add_argument(
-        'data', help='Path to the folder with the pkl files')
+    # Create BILSTMs
+    qp_bilstm = BILSTM(embedding_matrix, embedding_dim=300, hidden_dim=100,
+                batch_size=30)
+    interaction_bilstm = BILSTM(embedding_matrix, embedding_dim=300, hidden_dim=100,
+                batch_size=30)
 
-
-    qp_bilstm = BILSTM(embedding_matrix=pickle.load(args.embeddings, 'rb'), embedding_dim=300, hidden_dim=100, batch_size=30)
-    interaction_bilstm = BILSTM(embedding_matrix=pickle.load(args.embeddings, 'rb'), embedding_dim=300, hidden_dim=100, batch_size=30)
-
-    file_paths = get_file_paths(args.data)
+    # Retrieve the filepaths of all encoded corpora
+    file_paths = get_file_paths(encoded_corpora)
 
     qp_representations = {}
 
@@ -39,12 +42,28 @@ if __name__ == '__main__':
             for item in content:
                 item_id = item.key()
                 question = item[item_id]['question']
-                q_representation = qp_bilstm.forward(question) #get the question representation
+                q_representation = qp_bilstm.forward(question)  # get the question representation
                 contexts = item[item_id]['contexts']
                 c_representations = []
                 for context in contexts:
-                    c_representation = qp_bilstm.forward(context) #get the context representation
+                    c_representation = qp_bilstm.forward(context)  # get the context representation
                     c_representations.append(c_representation)
                 qp_representations[item_id] = {'q_repr': q_representation,
-                                                'c_repr': c_representations}
-            #TODO: get question and context interaction
+                                               'c_repr': c_representations}
+            # TODO: get question and context interaction
+
+
+if __name__ == '__main__':
+
+    parser = ArgumentParser(
+        description='Main ODQA script')
+    parser.add_argument(
+        'embeddings', help='Path to the pkl file')
+    parser.add_argument(
+        'data', help='Path to the folder with the pkl files')
+
+    # Parse given arguments
+    args = parser.parse_args()
+
+    # Call main()
+    main(embedding_matrix=pickle.load(args.embeddings, 'rb'), encoded_corpora=args.data)
