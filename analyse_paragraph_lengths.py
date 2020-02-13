@@ -44,7 +44,8 @@ def recommend_padding_length(length_values):
     :param length_values:
     :return:
     '''
-    return statistics.mean(length_values) + (0.5*statistics.pstdev(length_values))
+    #return statistics.mean(length_values) + (0.5*statistics.pstdev(length_values))
+    return max(length_values)
 
 if __name__ == "__main__":
     # Quasar length passage measures
