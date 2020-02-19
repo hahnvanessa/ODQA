@@ -11,6 +11,8 @@ class question_answer_set(Dataset):
 
 
     def __init__(self, file_content):
+        # todo: implement a max size parameter to allow for mini-sets, it should stop reading in content when
+        # reaching max_size
         # Questions
         self.questions = None
         self.question_lengths = None
@@ -24,7 +26,6 @@ class question_answer_set(Dataset):
         self.longtype = torch.int64
         # Length of dataset (number of question_context_answer pairs)
         self.set_len = None
-        
         self.read_in_dataset(file_content)
 
 
@@ -40,9 +41,9 @@ class question_answer_set(Dataset):
         # todo: ensure that this torch tensor is of self.LongType
         for item in content:
             item_id = item
-            question = torch.from_numpy(content[item_id]['encoded_question'])
-            contexts = torch.from_numpy(content[item_id]['encoded_contexts'])
-            answer = torch.from_numpy(content[item_id]['encoded_answer'])
+            question = content[item_id]['encoded_question']
+            contexts = content[item_id]['encoded_contexts']
+            answer = content[item_id]['encoded_answer']
             for context in contexts:
                 question_context_answer_pairs.append([question, context, answer])
 
@@ -59,14 +60,18 @@ class question_answer_set(Dataset):
         # note: inefficient, stores questions and answers multiple times
         for idx, (q, c, a) in enumerate(question_context_answer_pairs):
             # Update embedding matrices
-            self.questions[idx] = q
-            self.contexts[idx] = c
-            self.answers[idx] = a
+            self.questions[idx] = torch.from_numpy(q)
+            self.contexts[idx] = torch.from_numpy(c)
+            self.answers[idx] = torch.from_numpy(a)
 
             # Update length matrices
-            self.question_lengths[idx] = list(torch.size(torch.nonzero(q)))[1]
-            self.context_lengths[idx] = list(torch.size(torch.nonzero(c)))[1]
-            self.answer_lengths[idx] = list(torch.size(torch.nonzero(a)))[1]
+            #self.question_lengths[idx] = list(torch.shape(torch.nonzero(q)))[1]
+            #self.context_lengths[idx] = list(torch.shape(torch.nonzero(c)))[1]
+            #self.answer_lengths[idx] = list(torch.shape(torch.nonzero(a)))[1]
+            print(q, c, a)
+            self.question_lengths[idx] = len(q[a.nonzero()])
+            self.context_lengths[idx] = len(c[a.nonzero()])
+            self.answer_lengths[idx] = len(a[a.nonzero()])
 
     def __getitem__(self, index):
         '''
@@ -76,7 +81,6 @@ class question_answer_set(Dataset):
         :return:
         '''
         # todo: could we calculate the lengths on the fly within getitem?
-        return self.x_data[index], self.y_data[index]
         return self.questions[index], self.contexts[index], self.answers[index], self.question_lengths[idx], self.context_lengths[idx], self.answer_lengths[idx]
 
 
