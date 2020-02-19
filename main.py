@@ -7,6 +7,7 @@ import torch
 from torch.nn.utils.rnn import pack_padded_sequence
 import question_answer_set
 from torch.utils.data import Dataset, DataLoader
+import question_answer_set as qas
 
 MAX_SEQUENCE_LENGTH = 100
 
@@ -58,10 +59,9 @@ def batch_training(dataset, embedding_matrix, batch_size=6, num_epochs=10):
             q_representation = qp_bilstm.forward(packed_q)
             c_representation = qp_bilstm.forward(packed_c)
             HP_attention = attention(q_representation, c_representation)
-            # todo: finish the forward operations, this is basically just transferring
-            # stuff from the main function into here
+            # todo: finish the forward operations, this is basically just transferring stuff from the main function into here
 
-            # Unpack (add the paddings)
+            # Unpack (add the paddings again, so the sentences are in their original form)
             G_p_packed = torch.nn.utils.rnn.pad_packed_sequence(G_p_packed, batch_first=True)
             G_ps.append(G_p_packed)
 
@@ -97,7 +97,7 @@ def main(embedding_matrix, encoded_corpora):
             content = pickle.load(f)
 
             # Minibatch training
-            dataset = question_answer_set(content)
+            dataset = qas.question_answer_set(content)
             batch_training(dataset, embedding_matrix, batch_size=6, num_epochs=10)
 
             for item in content:
