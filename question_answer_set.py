@@ -39,6 +39,8 @@ class question_answer_set(Dataset):
 
         # Read q,c,a and convert to a torch tensor
         # todo: ensure that this torch tensor is of self.LongType
+        # todo: we could make this more memory efficient if we would store a mapping to the question
+        # insteado of the question itself for every q,c,a pair
         for item in content:
             item_id = item
             question = content[item_id]['encoded_question']
@@ -50,11 +52,11 @@ class question_answer_set(Dataset):
         self.set_len = len(question_context_answer_pairs)
         # Initialize empty matrices
         self.questions = torch.zeros(self.set_len, MAX_SEQUENCE_LENGTH,dtype=self.longtype)
-        self.question_lengths = torch.zeros(self.set_len,dtype=self.longtype)
+        self.question_lengths = torch.zeros(self.set_len,1,dtype=self.longtype)
         self.contexts = torch.zeros(self.set_len, MAX_SEQUENCE_LENGTH,dtype=self.longtype)
-        self.context_lengths = torch.zeros(self.set_len,dtype=self.longtype)
+        self.context_lengths = torch.zeros(self.set_len,1,dtype=self.longtype)
         self.answers = torch.zeros(self.set_len, MAX_SEQUENCE_LENGTH,dtype=self.longtype)
-        self.answer_lengths = torch.zeros(self.set_len, MAX_SEQUENCE_LENGTH,dtype=self.longtype)
+        self.answer_lengths = torch.zeros(self.set_len, 1, dtype=self.longtype)
 
         # Update the matrices
         # note: inefficient, stores questions and answers multiple times
@@ -64,14 +66,11 @@ class question_answer_set(Dataset):
             self.contexts[idx] = torch.from_numpy(c)
             self.answers[idx] = torch.from_numpy(a)
 
-            # Update length matrices
-            #self.question_lengths[idx] = list(torch.shape(torch.nonzero(q)))[1]
-            #self.context_lengths[idx] = list(torch.shape(torch.nonzero(c)))[1]
-            #self.answer_lengths[idx] = list(torch.shape(torch.nonzero(a)))[1]
-            print(q, c, a)
-            self.question_lengths[idx] = len(q[a.nonzero()])
-            self.context_lengths[idx] = len(c[a.nonzero()])
+            # Update length vectors
+            self.question_lengths[idx] = len(q[q.nonzero()])
+            self.context_lengths[idx] = len(c[c.nonzero()])
             self.answer_lengths[idx] = len(a[a.nonzero()])
+        print("Dataset is now ready for action.") #todo: delete
 
     def __getitem__(self, index):
         '''
@@ -81,7 +80,7 @@ class question_answer_set(Dataset):
         :return:
         '''
         # todo: could we calculate the lengths on the fly within getitem?
-        return self.questions[index], self.contexts[index], self.answers[index], self.question_lengths[idx], self.context_lengths[idx], self.answer_lengths[idx]
+        return self.questions[index], self.contexts[index], self.answers[index], self.question_lengths[index], self.context_lengths[index], self.answer_lengths[index]
 
 
     def __len__(self):
