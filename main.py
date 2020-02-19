@@ -100,6 +100,8 @@ def main(embedding_matrix, encoded_corpora):
             dataset = qas.question_answer_set(content)
             batch_training(dataset, embedding_matrix, batch_size=6, num_epochs=10)
 
+            # todo: transfer all this code into batch_training()
+            '''
             for item in content:
                 item_id = item
                 question = content[item_id]['encoded_question']
@@ -108,10 +110,6 @@ def main(embedding_matrix, encoded_corpora):
                 contexts = content[item_id]['encoded_contexts']
                 c_representations = []
                 G_ps = []
-
-                # Packing, requires padded,embedded sequences
-                # todo: check if we need to embed numbers with <N>
-                x_packed = pack_padded_sequence(x_embed, x_lens, batch_first=True, enforce_sorted=False)
 
                 for context in contexts:
                     context = torch.tensor(context).to(torch.int64)
@@ -124,7 +122,7 @@ def main(embedding_matrix, encoded_corpora):
                 int_representations[item_id] = G_ps
                 qp_representations[item_id] = {'q_repr': q_representation,
                                                'c_repr': c_representations}
-
+            '''
 if __name__ == '__main__':
 
     parser = ArgumentParser(
