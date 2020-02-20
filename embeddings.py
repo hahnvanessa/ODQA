@@ -174,7 +174,7 @@ def make_emedding_matrix(glove_dict, target_vocab):
     print('{} of the {} words in the quasar/searchqa set were found in the glove set'.format(words_found, matrix_len))
     return weights_matrix, idx_2_word, word_2_idx
 
-
+# todo: change name of function to encode_pad
 def encode_pad_context(tokenized_context, word_2_idx):
     '''
     Given a tokenized context, pads or trunctuates the context, applies index on tokens
@@ -185,8 +185,7 @@ def encode_pad_context(tokenized_context, word_2_idx):
     '''
     encoded_context = []
     # Pad context or trunctuate context
-    tokenized_context.extend(
-        [PAD_IDENTIFIER] * MAX_SEQUENCE_LENGTH)  # always add so min size is always MAX_SEQUENCE_LENGTH + 1
+    tokenized_context.extend([PAD_IDENTIFIER] * MAX_SEQUENCE_LENGTH)  # always add so min size is always MAX_SEQUENCE_LENGTH + 1
     tokenized_context = tokenized_context[:MAX_SEQUENCE_LENGTH]
     # Index words, identify unkown ones
     for t in tokenized_context:
@@ -219,7 +218,7 @@ def encode_corpus_dict(corpus_dict, word_2_idx) -> dict:
         del corpus_dict[question_id]['tokenized_question']
         # Encode answer
         encoded_answer = encode_pad_context(corpus_dict[question_id]['tokenized_answer'], word_2_idx)
-        corpus_dict[question_id]['encoded_answer'] = encoded_question
+        corpus_dict[question_id]['encoded_answer'] = encoded_answer
         del corpus_dict[question_id]['tokenized_answer']
         i += 1
         if i % 1000 == 0:
