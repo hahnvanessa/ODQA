@@ -11,6 +11,7 @@ class question_answer_set(Dataset):
 
     def __init__(self, file_content):
         # todo: implement a max size parameter to allow for mini-sets, it should stop reading in content when
+        # some index is reached
         self.set_len = None
 
         # Tensor storage
@@ -29,10 +30,7 @@ class question_answer_set(Dataset):
         '''
         self.set_len = None
 
-        # Read q,c,a and convert to a torch tensor
-        # todo: ensure that this torch tensor is of self.LongType
-        # todo: we could make this more memory efficient if we would store a mapping to the question
-        # insteado of the question itself for every q,c,a pair
+        # Read q,c,a and convert to torch tensors
         for idx, item in enumerate(content):
             item_id = item
             question = content[item_id]['encoded_question']
