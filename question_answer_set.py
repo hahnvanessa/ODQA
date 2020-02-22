@@ -3,10 +3,11 @@ from torch.utils.data import Dataset, DataLoader
 
 MAX_SEQUENCE_LENGTH = 100
 
-class question_answer_set(Dataset):
+class Question_Answer_Set(Dataset):
     '''
     Store and load data for training and testing. This can be used to
-    create minibatches.
+    create minibatches. Also handles converting the numpy-encoded
+    embeddings to LongTensors.
     '''
 
     def __init__(self, file_content):

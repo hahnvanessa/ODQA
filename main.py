@@ -8,6 +8,7 @@ from torch.nn.utils.rnn import pack_padded_sequence
 import question_answer_set
 from torch.utils.data import Dataset, DataLoader
 import question_answer_set as qas
+import candidate_scoring
 
 MAX_SEQUENCE_LENGTH = 100
 
@@ -21,11 +22,45 @@ def get_file_paths(data_dir):
                 file_names.append(os.path.join(r, file))
     return file_names
 
+def reward(c, a, c_len, a_len):
+    '''
+    Returns the reward for the candidate prediction.
+    todo: Make this capabele of using batches
+    :param candidate:
+    :param answer:
+    :return:
+    '''
 
+    def f1_score(c, a, c_len, a_len, epsilon=1e-7):
+        # source for reference: https://gist.github.com/SuperShinyEyes/dcc68a08ff8b615442e3bc6a9b55a354
+        y_true = torch.ones(c.shape, dtype=torch.bool).long()
+        y_pred = torch.eq(c, a).long()
+        tp = (y_true * y_pred).sum().to(torch.float32)
+        tn = ((1 - y_true) * (1 - y_pred)).sum().to(torch.float32)
+        fp = ((1 - y_true) * y_pred).sum().to(torch.float32)
+        fn = (y_true * (1 - y_pred)).sum().to(torch.float32)
+
+
+        precision = tp / (tp + fp + epsilon)
+        recall = tp / (tp + fn + epsilon)
+
+        f1 = 2 * (precision * recall) / (precision + recall + epsilon)
+        return f1
+
+    # Trim padding and cut away candidate if it is too long (no bag-of-words approach)
+    c = c[0, :a_len]
+    a = a[0, :a_len]
+
+    if torch.all(torch.eq(c, a)):
+        return 2
+    elif len(torch.eq(c, a).nonzero()) > 0:
+        return f1_score(c, a, c_len, a_len)
+    else:
+        return -1
 
 def batch_training(dataset, embedding_matrix, batch_size=6, num_epochs=10):
     '''
-    Performs minibatch training
+    Performs minibatch training.
     :param dataset:
     :param embedding_matrix:
     :param batch_size:
@@ -45,6 +80,7 @@ def batch_training(dataset, embedding_matrix, batch_size=6, num_epochs=10):
     interaction_bilstm = BiLSTM(embedding_matrix, embedding_dim=400, hidden_dim=100,
                 batch_size=1)
     G_bilstm = nn.LSTM(input_size=400, hidden_size=100, bidirectional=True)
+    C_scores = candidate_scoring.Candidate_Scorer()
 
 
     for epoch in range(num_epochs):
@@ -55,16 +91,22 @@ def batch_training(dataset, embedding_matrix, batch_size=6, num_epochs=10):
             packed_q = torch.nn.utils.rnn.pack_padded_sequence(questions, q_len, batch_first=True)
             packed_c = torch.nn.utils.rnn.pack_padded_sequence(contexts, c_len, batch_first=True)
             packed_a = torch.nn.utils.rnn.pack_padded_sequence(answers, a_len, batch_first=True)
-            # Forward operations
+            # Question and Passage Representation
             q_representation = qp_bilstm.forward(packed_q)
             c_representation = qp_bilstm.forward(packed_c)
+            # Question and Passe Interaction
             HP_attention = attention(q_representation, c_representation)
-            # todo: finish the forward operations, this is basically just transferring stuff from the main function into here
-
+            G_input = torch.cat((c_representation, HP_attention), 2)
+            G_p = G_bilstm.forward(G_input)
+            G_p_list.append(G_p) # why do we store G_p
+            #todo: decide if the following is still required when we use batch learning
+            #int_representations[item_id] = G_p #inludes multiple qa-pairs since it is a batch
+            #qp_representations[item_id] = {'q_repr': q_representation,
+                                           #'c_repr': c_representation}
+            # Candidate Scoring
             # Unpack (add the paddings again, so the sentences are in their original form)
-            G_p_packed = torch.nn.utils.rnn.pad_packed_sequence(G_p_packed, batch_first=True)
-            G_ps.append(G_p_packed)
-
+            #G_p_packed = torch.nn.utils.rnn.pad_packed_sequence(G_p_packed, batch_first=True)
+            #G_ps.append(G_p_packed)
 
 
 
@@ -97,7 +139,7 @@ def main(embedding_matrix, encoded_corpora):
             content = pickle.load(f)
 
             # Minibatch training
-            dataset = qas.question_answer_set(content)
+            dataset = qas.Question_Answer_Set(content)
             batch_training(dataset, embedding_matrix, batch_size=6, num_epochs=10)
 
             # todo: transfer all this code into batch_training()
