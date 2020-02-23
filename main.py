@@ -24,7 +24,7 @@ def get_file_paths(data_dir):
 
 def reward(c, a, c_len, a_len):
     '''
-    Returns the reward for the candidate prediction.
+    Returns the reward for a candidate prediction.
     todo: Make this capabele of using batches
     :param candidate:
     :param answer:
@@ -47,9 +47,10 @@ def reward(c, a, c_len, a_len):
         f1 = 2 * (precision * recall) / (precision + recall + epsilon)
         return f1
 
-    # Trim padding and cut away candidate if it is too long (no bag-of-words approach)
-    c = c[0, :a_len]
-    a = a[0, :a_len]
+    # Trim padding to context len
+    assert c_len >= a_len
+    c = c[0, :c_len]
+    a = a[0, :c_len]
 
     if torch.all(torch.eq(c, a)):
         return 2
