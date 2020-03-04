@@ -123,13 +123,6 @@ def main(embedding_matrix, encoded_corpora):
 
     embedding_matrix = pickle.load(open(embedding_matrix, 'rb'))
 
-    # Create BILSTMs
-    qp_bilstm = BiLSTM(embedding_matrix, embedding_dim=300, hidden_dim=100,
-                batch_size=1)
-    interaction_bilstm = BiLSTM(embedding_matrix, embedding_dim=400, hidden_dim=100,
-                batch_size=1)
-    G_bilstm = nn.LSTM(input_size=400, hidden_size=100, bidirectional=True)
-
     # Retrieve the filepaths of all encoded corpora
     file_paths = get_file_paths(encoded_corpora)
 
