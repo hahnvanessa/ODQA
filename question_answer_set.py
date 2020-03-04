@@ -11,7 +11,6 @@ class Question_Answer_Set(Dataset):
     '''
 
     def __init__(self, file_content):
-        # todo: implement a max size parameter to allow for mini-sets, it should stop reading in content when
         # some index is reached
         self.set_len = None
 

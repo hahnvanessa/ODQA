@@ -16,7 +16,7 @@ def get_file_paths(data_dir):
     # Get paths for all files in the given directory
     file_names = []
     # r=root, d=directories, f = files
-    for r, d, f in os.walk(args.data):
+    for r, d, f in os.walk(data_dir):
         for file in f:
             if '.pkl' in file:
                 file_names.append(os.path.join(r, file))
@@ -47,7 +47,7 @@ def reward(c, a, c_len, a_len):
         f1 = 2 * (precision * recall) / (precision + recall + epsilon)
         return f1
 
-    # Trim padding to context len
+    # Trim padding to candidate len
     assert c_len >= a_len
     c = c[0, :c_len]
     a = a[0, :c_len]
@@ -74,14 +74,14 @@ def batch_training(dataset, embedding_matrix, batch_size=6, num_epochs=10):
     # Store representations
     qp_representations = {}
     int_representations = {}
+    candidate_scores = {}
 
     # Initialize BiLSTMs
     qp_bilstm = BiLSTM(embedding_matrix, embedding_dim=300, hidden_dim=100,
-                batch_size=1)
+                batch_size=batch_size)
     interaction_bilstm = BiLSTM(embedding_matrix, embedding_dim=400, hidden_dim=100,
-                batch_size=1)
+                batch_size=batch_size) #check this batch size
     G_bilstm = nn.LSTM(input_size=400, hidden_size=100, bidirectional=True)
-    C_scores = candidate_scoring.Candidate_Scorer()
 
 
     for epoch in range(num_epochs):
@@ -89,27 +89,28 @@ def batch_training(dataset, embedding_matrix, batch_size=6, num_epochs=10):
         for batch_number, data in enumerate(train_loader):
             questions, contexts, answers, q_len, c_len, a_len = data
             # Pack (reduce the sentences to their original form without padding)
-            packed_q = torch.nn.utils.rnn.pack_padded_sequence(questions, q_len, batch_first=True)
-            packed_c = torch.nn.utils.rnn.pack_padded_sequence(contexts, c_len, batch_first=True)
-            packed_a = torch.nn.utils.rnn.pack_padded_sequence(answers, a_len, batch_first=True)
+            packed_q = torch.nn.utils.rnn.pack_padded_sequence(questions, q_len, batch_first=True, enforce_sorted=False)
+            packed_c = torch.nn.utils.rnn.pack_padded_sequence(contexts, c_len, batch_first=True, enforce_sorted=False)
+            packed_a = torch.nn.utils.rnn.pack_padded_sequence(answers, a_len, batch_first=True, enforce_sorted=False)
             # Question and Passage Representation
-            q_representation = qp_bilstm.forward(packed_q)
-            c_representation = qp_bilstm.forward(packed_c)
-            # Question and Passe Interaction
+            q_representation = qp_bilstm.forward(questions)
+            c_representation = qp_bilstm.forward(contexts)
+            # Question and Passage Interaction
             HP_attention = attention(q_representation, c_representation)
             G_input = torch.cat((c_representation, HP_attention), 2)
-            G_p = G_bilstm.forward(G_input)
-            G_p_list.append(G_p) # why do we store G_p
-            #todo: decide if the following is still required when we use batch learning
-            #int_representations[item_id] = G_p #inludes multiple qa-pairs since it is a batch
-            #qp_representations[item_id] = {'q_repr': q_representation,
-                                           #'c_repr': c_representation}
-            # Candidate Scoring
-            # Unpack (add the paddings again, so the sentences are in their original form)
-            #G_p_packed = torch.nn.utils.rnn.pad_packed_sequence(G_p_packed, batch_first=True)
-            #G_ps.append(G_p_packed)
+            G_ps, _ = G_bilstm.forward(G_input)
 
-
+            scores = []  # store all candidate scores for each context for the current question
+            for G_p in G_ps:
+                print('gp', G_p.shape)
+                input()
+                # create a new Candidate Scorer for each context
+                C_scores = candidate_scoring.Candidate_Scorer(G_p).candidate_probabilities()  # candidate scores for current context
+                print('cscores', C_scores.shape)
+                input()
+                scores.append(C_scores)
+            # if we create only one candidate scorer instance before (e.g. one for each question or one for all questions), we need to change the G_p argument
+            print('scores', scores)
 
 def main(embedding_matrix, encoded_corpora):
     '''
@@ -141,33 +142,10 @@ def main(embedding_matrix, encoded_corpora):
 
             # Minibatch training
             dataset = qas.Question_Answer_Set(content)
-            batch_training(dataset, embedding_matrix, batch_size=6, num_epochs=10)
+            batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10)
 
-            # todo: transfer all this code into batch_training()
-            '''
-            for item in content:
-                item_id = item
-                question = content[item_id]['encoded_question']
-                question = torch.tensor(question).to(torch.int64)
-                q_representation = qp_bilstm.forward(question)  # get the question representation
-                contexts = content[item_id]['encoded_contexts']
-                c_representations = []
-                G_ps = []
-
-                for context in contexts:
-                    context = torch.tensor(context).to(torch.int64)
-                    c_representation = qp_bilstm.forward(context)  # get the context representation
-                    c_representations.append(c_representation)
-                    HP_attention = attention(q_representation, c_representation)
-                    G_input = torch.cat((c_representation, HP_attention), 2)
-                    G_p = G_bilstm.forward(G_input)
-                    G_ps.append(G_p)
-                int_representations[item_id] = G_ps
-                qp_representations[item_id] = {'q_repr': q_representation,
-                                               'c_repr': c_representations}
-            '''
 if __name__ == '__main__':
-
+    '''
     parser = ArgumentParser(
         description='Main ODQA script')
     parser.add_argument(
@@ -177,6 +155,9 @@ if __name__ == '__main__':
 
     # Parse given arguments
     args = parser.parse_args()
+    '''
+
 
     # Call main()
-    main(embedding_matrix=args.embeddings, encoded_corpora=args.data)
+    #main(embedding_matrix=args.embeddings, encoded_corpora=args.data)
+    main(embedding_matrix='embedding_matrix.pkl', encoded_corpora='outputs_numpy_encoding_v2')
