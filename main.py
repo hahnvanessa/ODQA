@@ -72,44 +72,41 @@ def batch_training(dataset, embedding_matrix, batch_size=6, num_epochs=10):
             print('scores', scores)
 
 def main(embedding_matrix, encoded_corpora):
-    '''
-    Iterates through all given corpus files and forwards the encoded contexts and questions
-    through the BILSTMs.
-    :param embedding_matrix:
-    :param encoded_corpora:
-    :return:
-    '''
+	'''
+	Iterates through all given corpus files and forwards the encoded contexts and questions
+	through the BILSTMs.
+	:param embedding_matrix:
+	:param encoded_corpora:
+	:return:
+	'''
 
-    embedding_matrix = pickle.load(open(embedding_matrix, 'rb'))
+	embedding_matrix = pickle.load(open(embedding_matrix, 'rb'))
 
-    # Retrieve the filepaths of all encoded corpora
-    file_paths = get_file_paths(encoded_corpora)
+  # Retrieve the filepaths of all encoded corpora
+  file_paths = get_file_paths(encoded_corpora)
 
-    qp_representations = {}
-    int_representations = {}
+  # Apply training to alls sets in the encoded corpora folder
+  for file in file_paths:
+      with open(os.path.join(file), 'rb') as f:
+          content = pickle.load(f)
+          
+          # Minibatch training
+          dataset = qas.Question_Answer_Set(content)
+          batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10)
 
-    for file in file_paths:
-        with open(os.path.join(file), 'rb') as f:
-            content = pickle.load(f)
-
-            # Minibatch training
-            dataset = qas.Question_Answer_Set(content)
-            batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10)
 
 if __name__ == '__main__':
 
-    parser = ArgumentParser(
-        description='Main ODQA script')
-    parser.add_argument(
-        'embeddings', help='Path to the pkl file')
-    parser.add_argument(
-        'data', help='Path to the folder with the pkl files')
+	parser = ArgumentParser(
+		description='Main ODQA script')
+	parser.add_argument(
+		'embeddings', help='Path to the pkl file')
+	parser.add_argument(
+		'data', help='Path to the folder with the pkl files')
 
-    # Parse given arguments
-    args = parser.parse_args()
+	# Parse given arguments
+	args = parser.parse_args()
 
-
-
-    # Call main()
-    main(embedding_matrix=args.embeddings, encoded_corpora=args.data)
-    #main(embedding_matrix='embedding_matrix.pkl', encoded_corpora='outputs_numpy_encoding_v2')
+  # Call main()
+  main(embedding_matrix=args.embeddings, encoded_corpora=args.data)
+  #main(embedding_matrix='embedding_matrix.pkl', encoded_corpora='outputs_numpy_encoding_v2'

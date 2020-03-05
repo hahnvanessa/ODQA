@@ -18,7 +18,7 @@ class Candidate_Scorer():
         e_P = self.end_scores() #target vector 1x100
         # todo: perform this as a matrix addition
         numerator = torch.exp(b_P + e_P.transpose(0,1))
-        denominator = torch.sum(numerator)
+        denominator = torch.sum(numerator) 
         x = torch.div(numerator, denominator)
         norm = x.norm(p=2, dim=1, keepdim=True)
         x_normalized = x.div(norm)
