@@ -22,43 +22,6 @@ def get_file_paths(data_dir):
                 file_names.append(os.path.join(r, file))
     return file_names
 
-def reward(c, a, c_len, a_len):
-    '''
-    Returns the reward for a candidate prediction.
-    todo: Make this capabele of using batches
-    :param candidate:
-    :param answer:
-    :return:
-    '''
-
-    def f1_score(c, a, c_len, a_len, epsilon=1e-7):
-        # source for reference: https://gist.github.com/SuperShinyEyes/dcc68a08ff8b615442e3bc6a9b55a354
-        y_true = torch.ones(c.shape, dtype=torch.bool).long()
-        y_pred = torch.eq(c, a).long()
-        tp = (y_true * y_pred).sum().to(torch.float32)
-        tn = ((1 - y_true) * (1 - y_pred)).sum().to(torch.float32)
-        fp = ((1 - y_true) * y_pred).sum().to(torch.float32)
-        fn = (y_true * (1 - y_pred)).sum().to(torch.float32)
-
-
-        precision = tp / (tp + fp + epsilon)
-        recall = tp / (tp + fn + epsilon)
-
-        f1 = 2 * (precision * recall) / (precision + recall + epsilon)
-        return f1
-
-    # Trim padding to candidate len
-    assert c_len >= a_len
-    c = c[0, :c_len]
-    a = a[0, :c_len]
-
-    if torch.all(torch.eq(c, a)):
-        return 2
-    elif len(torch.eq(c, a).nonzero()) > 0:
-        return f1_score(c, a, c_len, a_len)
-    else:
-        return -1
-
 def batch_training(dataset, embedding_matrix, batch_size=6, num_epochs=10):
     '''
     Performs minibatch training.
@@ -102,12 +65,8 @@ def batch_training(dataset, embedding_matrix, batch_size=6, num_epochs=10):
 
             scores = []  # store all candidate scores for each context for the current question
             for G_p in G_ps:
-                print('gp', G_p.shape)
-                input()
                 # create a new Candidate Scorer for each context
                 C_scores = candidate_scoring.Candidate_Scorer(G_p).candidate_probabilities()  # candidate scores for current context
-                print('cscores', C_scores.shape)
-                input()
                 scores.append(C_scores)
             # if we create only one candidate scorer instance before (e.g. one for each question or one for all questions), we need to change the G_p argument
             print('scores', scores)
@@ -138,7 +97,7 @@ def main(embedding_matrix, encoded_corpora):
             batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10)
 
 if __name__ == '__main__':
-    '''
+
     parser = ArgumentParser(
         description='Main ODQA script')
     parser.add_argument(
@@ -148,9 +107,9 @@ if __name__ == '__main__':
 
     # Parse given arguments
     args = parser.parse_args()
-    '''
+
 
 
     # Call main()
-    #main(embedding_matrix=args.embeddings, encoded_corpora=args.data)
-    main(embedding_matrix='embedding_matrix.pkl', encoded_corpora='outputs_numpy_encoding_v2')
+    main(embedding_matrix=args.embeddings, encoded_corpora=args.data)
+    #main(embedding_matrix='embedding_matrix.pkl', encoded_corpora='outputs_numpy_encoding_v2')
