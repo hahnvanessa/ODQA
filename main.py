@@ -87,7 +87,7 @@ def batch_training(dataset, embedding_matrix, batch_size=6, num_epochs=10):
     for epoch in range(num_epochs):
 
         for batch_number, data in enumerate(train_loader):
-            questions, contexts, answers, q_len, c_len, a_len = data
+            questions, contexts, answers, q_len, c_len, a_len, q_id = data
             # Pack (reduce the sentences to their original form without padding)
             packed_q = torch.nn.utils.rnn.pack_padded_sequence(questions, q_len, batch_first=True, enforce_sorted=False)
             packed_c = torch.nn.utils.rnn.pack_padded_sequence(contexts, c_len, batch_first=True, enforce_sorted=False)

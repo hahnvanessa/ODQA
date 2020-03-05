@@ -7,7 +7,7 @@ class Question_Answer_Set(Dataset):
     '''
     Store and load data for training and testing. This can be used to
     create minibatches. Also handles converting the numpy-encoded
-    embeddings to LongTensors.
+    embeddings into LongTensors.
     '''
 
     def __init__(self, file_content):
@@ -44,7 +44,13 @@ class Question_Answer_Set(Dataset):
         self.set_len = len(self.questionid_context_answerid)
 
     def get_question(self, index):
-        return self.questions[self.questionid_context_answerid[index][0]]
+        '''
+        Returns both the question as LongTensor and the id of that question. Id can later be used to reference the
+        question.
+        :param index:
+        :return:
+        '''
+        return self.questions[self.questionid_context_answerid[index][0]], self.questionid_context_answerid[index][0]
 
     def get_answer(self, index):
         return self.answers[self.questionid_context_answerid[index][2]]
@@ -63,10 +69,10 @@ class Question_Answer_Set(Dataset):
         :param index:
         :return:
         '''
-        question = self.get_question(index)
+        question, q_id = self.get_question(index)
         context = self.get_context(index)
         answer = self.get_answer(index)
-        return question, context, answer, self.determine_length(question), self.determine_length(context), self.determine_length(answer)
+        return question, context, answer, self.determine_length(question), self.determine_length(context), self.determine_length(answer), q_id
 
 
     def __len__(self):
