@@ -23,11 +23,8 @@ GLOVE_FILE = Path("/".join([dirpath, 'glove.840B.300d.txt']))
 GLOVE_PATH = Path(dirpath)
 
 # Filepaths to files that will be used to create the embedding matrix
-DATASET_PATH_SEARCHQA = Path("/".join([dirpath, 'outputs', 'searchqa_test.pkl']))  # pickled
-DATASET_PATH_QUASAR = Path("/".join([dirpath, 'outputs', 'quasar_test_short.pkl']))  # pickled
-#todo: Include file paths for all test, val and toy sets
-DATASET_PATH_TOY_QUASAR =  Path("/".join([dirpath, 'outputs', 'quasar_test_short.pkl']))#Path("/".join([dirpath, 'outputs', 'quasar_toy.pkl']))  # pickled
-DATASET_PATH_TOY_SEARCHQA = Path("/".join([dirpath, 'outputs', 'searchqa_test.pkl'])) #Path("/".join([dirpath, 'outputs', 'searchqa_toy.pkl']))  # pickled
+DATASET_PATH_SEARCHQA = Path("/".join([dirpath, 'outputs', 'searchqa_train.pkl']))  # pickled
+DATASET_PATH_QUASAR = Path("/".join([dirpath, 'outputs', 'quasar_train_short.pkl']))  # pickled
 # Output Pathes
 OUTPUT_PATH_ENCODED = Path("/".join([dirpath, 'outputs']))
 
@@ -174,7 +171,7 @@ def make_emedding_matrix(glove_dict, target_vocab):
     print('{} of the {} words in the quasar/searchqa set were found in the glove set'.format(words_found, matrix_len))
     return weights_matrix, idx_2_word, word_2_idx
 
-
+# todo: change name of function to encode_pad
 def encode_pad_context(tokenized_context, word_2_idx):
     '''
     Given a tokenized context, pads or trunctuates the context, applies index on tokens
@@ -185,8 +182,7 @@ def encode_pad_context(tokenized_context, word_2_idx):
     '''
     encoded_context = []
     # Pad context or trunctuate context
-    tokenized_context.extend(
-        [PAD_IDENTIFIER] * MAX_SEQUENCE_LENGTH)  # always add so min size is always MAX_SEQUENCE_LENGTH + 1
+    tokenized_context.extend([PAD_IDENTIFIER] * MAX_SEQUENCE_LENGTH)  # always add so min size is always MAX_SEQUENCE_LENGTH + 1
     tokenized_context = tokenized_context[:MAX_SEQUENCE_LENGTH]
     # Index words, identify unkown ones
     for t in tokenized_context:
@@ -219,7 +215,7 @@ def encode_corpus_dict(corpus_dict, word_2_idx) -> dict:
         del corpus_dict[question_id]['tokenized_question']
         # Encode answer
         encoded_answer = encode_pad_context(corpus_dict[question_id]['tokenized_answer'], word_2_idx)
-        corpus_dict[question_id]['encoded_answer'] = encoded_question
+        corpus_dict[question_id]['encoded_answer'] = encoded_answer
         del corpus_dict[question_id]['tokenized_answer']
         i += 1
         if i % 1000 == 0:
@@ -229,9 +225,10 @@ def encode_corpus_dict(corpus_dict, word_2_idx) -> dict:
 
     return corpus_dict
 
-def encode_untokenized_file(DATASET_PATH, word_2_idx, type='quasar'):
+def encode_untokenized_file(DATASET_PATH, filename, word_2_idx, type='quasar'):
     '''
     Tokenizes and encodes a single file. This can be used to encode val, test or toy files.
+    Also saves to disk.
     :param filepath:
     :param type:
     :param word_2_idx:
@@ -243,6 +240,12 @@ def encode_untokenized_file(DATASET_PATH, word_2_idx, type='quasar'):
     tok_corpus_dict, _ = tokenize_set(DATASET_PATH, type=type)
     # Encode
     enc_corpus_dict = encode_corpus_dict(tok_corpus_dict, word_2_idx)
+    # Save to disk
+    with open(os.path.join(OUTPUT_PATH_ENCODED, filename), 'wb') as fo:
+        pickle.dump(quasar_enc_corpus_dict, fo)
+
+    print('wrote file to disk', filename)
+
     return enc_corpus_dict
 
 
@@ -342,7 +345,22 @@ if __name__ == "__main__":
     # Run main to create encoded training files, embedding matrix, word/index mappings
     searchqa_enc_corpus_dic, quasar_enc_corpus_dict, emb_mtx, idx_2_word, word_2_idx = main(process_glove=False, tokenize=True, encode=True)
     # Encode all other files that need to be encoded
-    # todo: encode test and val sets of quasar and searchqa
-    #encode_untokenized_file(DATASET_PATH_TOY_QUASAR, word_2_idx, type='quasar')
-    #encode_untokenized_file(DATASET_PATH_TOY_SEARCHQA, word_2_idx, type='searchqa')
 
+    # Input paths
+    SEARCHQA_VAL = Path("/".join([dirpath, 'outputs', 'searchqa_val.pkl']))
+    SEARCHQA_TEST = Path("/".join([dirpath, 'outputs', 'searchqa_test.pkl']))
+    QUASAR_DEV = Path("/".join([dirpath, 'outputs', 'quasar_dev_short.pkl']))
+    QUASAR_TEST = Path("/".join([dirpath, 'outputs', 'quasar_test_short.pkl']))
+
+    # Output filenames
+    ENC_SEARCHQA_VAL = 'enc_searchqa_val.pkl'
+    ENC_SEARCHQA_TEST = 'enc_searchqa_test.pkl'
+    ENC_QUASAR_DEV =  'enc_quasar_dev_short.pkl'
+    ENC_QUASAR_TEST =  'enc_quasar_test_short.pkl'
+
+
+    enc_searchqa_val = encode_untokenized_file(SEARCHQA_VAL, ENC_SEARCHQA_VAL, word_2_idx, type='searchqa')
+    enc_searchqa_test = encode_untokenized_file(SEARCHQA_TEST, ENC_SEARCHQA_TEST, word_2_idx, type='searchqa')
+
+    enc_quasar_dev = encode_untokenized_file(QUASAR_DEV, ENC_QUASAR_DEV, word_2_idx, type='quasar')
+    enc_quasar_test = encode_untokenized_file(QUASAR_TEST, ENC_QUASAR_TEST, word_2_idx, type='quasar')
