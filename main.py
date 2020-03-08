@@ -22,9 +22,9 @@ def get_file_paths(data_dir):
                 file_names.append(os.path.join(r, file))
     return file_names
 
-def batch_training(dataset, embedding_matrix, batch_size=6, num_epochs=10):
+def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
     '''
-    Performs minibatch training.
+    Performs minibatch training. One datapoint is a question-context-answer pair.
     :param dataset:
     :param embedding_matrix:
     :param batch_size:
@@ -48,13 +48,7 @@ def batch_training(dataset, embedding_matrix, batch_size=6, num_epochs=10):
     for epoch in range(num_epochs):
 
         for batch_number, data in enumerate(train_loader):
-            questions, contexts, answers, q_len, c_len, a_len, q_id = data
-            # Pack (reduce the sentences to their original form without padding)
-            '''
-            packed_q = torch.nn.utils.rnn.pack_padded_sequence(questions, q_len, batch_first=True, enforce_sorted=False)
-            packed_c = torch.nn.utils.rnn.pack_padded_sequence(contexts, c_len, batch_first=True, enforce_sorted=False)
-            packed_a = torch.nn.utils.rnn.pack_padded_sequence(answers, a_len, batch_first=True, enforce_sorted=False)
-            '''
+            questions, contexts, answers, q_len, c_len, a_len, q_id, common_word_encodings = data
             # Question and Passage Representation
             q_representation = qp_bilstm.forward(questions, sentence_lengths=q_len)
             c_representation = qp_bilstm.forward(contexts, sentence_lengths=c_len)
@@ -70,6 +64,20 @@ def batch_training(dataset, embedding_matrix, batch_size=6, num_epochs=10):
                 scores.append(C_scores)
             # if we create only one candidate scorer instance before (e.g. one for each question or one for all questions), we need to change the G_p argument
             print('scores', scores)
+
+            # Question Representation
+
+
+            # Passage Representation
+            cwe = common_word_encodings
+            #todo word embeddings
+            #todo question independent representation
+
+
+            # Candidate Representation
+
+
+
 
 def main(embedding_matrix, encoded_corpora):
     '''
@@ -97,7 +105,6 @@ def main(embedding_matrix, encoded_corpora):
             batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10)
 
 if __name__ == '__main__':
-    '''
     parser = ArgumentParser(
         description='Main ODQA script')
     parser.add_argument(
@@ -107,9 +114,8 @@ if __name__ == '__main__':
 
     # Parse given arguments
     args = parser.parse_args()
-    '''
 
 
     # Call main()
-    #main(embedding_matrix=args.embeddings, encoded_corpora=args.data)
-    main(embedding_matrix='embedding_matrix.pkl', encoded_corpora='outputs_numpy_encoding_v2')
+    main(embedding_matrix=args.embeddings, encoded_corpora=args.data)
+    #main(embedding_matrix='embedding_matrix.pkl', encoded_corpora='outputs_numpy_encoding_v2')
