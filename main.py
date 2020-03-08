@@ -115,7 +115,6 @@ if __name__ == '__main__':
     # Parse given arguments
     args = parser.parse_args()
 
-
     # Call main()
     main(embedding_matrix=args.embeddings, encoded_corpora=args.data)
     #main(embedding_matrix='embedding_matrix.pkl', encoded_corpora='outputs_numpy_encoding_v2')
