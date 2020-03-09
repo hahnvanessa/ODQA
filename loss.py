@@ -2,7 +2,7 @@ import torch
 
 class Loss_Function():
     '''
-    Contains all function necessary to calculate the loss
+    Contains all functions necessary to calculate the loss
     '''
 
     def __init__(self):

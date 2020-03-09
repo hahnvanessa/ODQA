@@ -22,9 +22,9 @@ def get_file_paths(data_dir):
                 file_names.append(os.path.join(r, file))
     return file_names
 
-def batch_training(dataset, embedding_matrix, batch_size=6, num_epochs=10):
+def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
     '''
-    Performs minibatch training.
+    Performs minibatch training. One datapoint is a question-context-answer pair.
     :param dataset:
     :param embedding_matrix:
     :param batch_size:
@@ -42,22 +42,16 @@ def batch_training(dataset, embedding_matrix, batch_size=6, num_epochs=10):
     # Initialize BiLSTMs
     qp_bilstm = BiLSTM(embedding_matrix, embedding_dim=300, hidden_dim=100,
                 batch_size=batch_size)
-    interaction_bilstm = BiLSTM(embedding_matrix, embedding_dim=400, hidden_dim=100,
-                batch_size=batch_size) #check this batch size
     G_bilstm = nn.LSTM(input_size=400, hidden_size=100, bidirectional=True)
 
 
     for epoch in range(num_epochs):
 
         for batch_number, data in enumerate(train_loader):
-            questions, contexts, answers, q_len, c_len, a_len, q_id = data
-            # Pack (reduce the sentences to their original form without padding)
-            packed_q = torch.nn.utils.rnn.pack_padded_sequence(questions, q_len, batch_first=True, enforce_sorted=False)
-            packed_c = torch.nn.utils.rnn.pack_padded_sequence(contexts, c_len, batch_first=True, enforce_sorted=False)
-            packed_a = torch.nn.utils.rnn.pack_padded_sequence(answers, a_len, batch_first=True, enforce_sorted=False)
+            questions, contexts, answers, q_len, c_len, a_len, q_id, common_word_encodings = data
             # Question and Passage Representation
-            q_representation = qp_bilstm.forward(questions)
-            c_representation = qp_bilstm.forward(contexts)
+            q_representation = qp_bilstm.forward(questions, sentence_lengths=q_len)
+            c_representation = qp_bilstm.forward(contexts, sentence_lengths=c_len)
             # Question and Passage Interaction
             HP_attention = attention(q_representation, c_representation)
             G_input = torch.cat((c_representation, HP_attention), 2)
@@ -70,6 +64,20 @@ def batch_training(dataset, embedding_matrix, batch_size=6, num_epochs=10):
                 scores.append(C_scores)
             # if we create only one candidate scorer instance before (e.g. one for each question or one for all questions), we need to change the G_p argument
             print('scores', scores)
+
+            # Question Representation
+
+
+            # Passage Representation
+            cwe = common_word_encodings
+            #todo word embeddings
+            #todo question independent representation
+
+
+            # Candidate Representation
+
+
+
 
 def main(embedding_matrix, encoded_corpora):
     '''
@@ -97,7 +105,6 @@ def main(embedding_matrix, encoded_corpora):
             batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10)
 
 if __name__ == '__main__':
-
     parser = ArgumentParser(
         description='Main ODQA script')
     parser.add_argument(
@@ -107,8 +114,6 @@ if __name__ == '__main__':
 
     # Parse given arguments
     args = parser.parse_args()
-
-
 
     # Call main()
     main(embedding_matrix=args.embeddings, encoded_corpora=args.data)

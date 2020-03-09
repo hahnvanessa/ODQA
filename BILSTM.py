@@ -1,5 +1,7 @@
 import torch
 from torch import nn
+from torch.nn.utils.rnn import pack_padded_sequence as pack
+from torch.nn.utils.rnn import pad_packed_sequence as unpack
 
 class BiLSTM(nn.Module):
     def __init__(self, embedding_matrix, embedding_dim, hidden_dim, batch_size, dropout=0.2):
@@ -18,12 +20,11 @@ class BiLSTM(nn.Module):
 
         #self.hidden2label = nn.Linear(hidden_dim, ?) #define second dimension - target length k?
 
-    def forward(self, sentence, attention=False):
-        x = self.embedding(sentence)
-        x = x.view(self.batch_size, self.hidden_dim, self.embedding_dim) # https://blog.floydhub.com/long-short-term-memory-from-zero-to-hero-with-pytorch/
-        lstm_out, (h_n, c_n) = self.bilstm(x) #how to input question AND paragraphs?
-        #h_n = tensor containing the hidden state for t = seq_len, c_n = tensor containing the cell state for t = seq_len
-        #y = self.hidden2label(lstm_out)
+    def forward(self, sentence, sentence_lengths):
+        packed_x = pack(self.embedding(sentence), sentence_lengths, batch_first=True, enforce_sorted=False)
+        #packed_x = packed_x.view(self.batch_size, self.hidden_dim, self.embedding_dim) # https://blog.floydhub.com/long-short-term-memory-from-zero-to-hero-with-pytorch/
+        lstm_out, _ = self.bilstm(packed_x)
+        lstm_out, lstm_out_lengths = unpack(lstm_out, total_length=100)
         return lstm_out
 
     #create another def attention to use in forward function
@@ -32,6 +33,7 @@ class BiLSTM(nn.Module):
 
 def attention(question, context):
     # assuming that input for question and context has dim 54x300 respectively and not 54x1x300
+    print(question.shape, context.shape)
     numerator = torch.exp(torch.bmm(question, torch.transpose(context, 1, 2)))
     denominator = torch.sum(numerator) #index 0?
     alpha_tk = torch.div(numerator,denominator) #->dim 54,54
