@@ -69,7 +69,22 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
 
 
             # Passage Representation
+            S_q = qp_bilstm.forward(questions, sentence_lengths=q_len)
+            mxp = nn.MaxPool2d((100, 1), stride=1) # do i need to address packing here, 0 will be deleted anyways, # Warning this assumes (#batchsize, #num_tokens, #embedding_dim), while it may be (#bs, #e_d, #n_t)
+            r_q = mxp(S_q) #(100, 1, 200)
+            w_emb = qp_bilstm.forward(contexts, sentence_lengths=c_len) #Can we reuse the previous c_representations?
             cwe = common_word_encodings
+
+            # Concatenation operation
+            print(w_emb.shape, cwe.shape)
+            R_p = torch.cat((w_emb, cwe), 2)
+            # Check the following with Stalin!
+            R_p = torch.cat((R_p, cwe.extend(batch_size, -1, 200)), 2)
+            print(R_p.shape)
+            print(w_emb.shape, r_q.shape, cwe.shape)
+            input()
+            # Recshape operation
+
             #todo word embeddings
             #todo question independent representation
 
@@ -105,6 +120,7 @@ def main(embedding_matrix, encoded_corpora):
             batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10)
 
 if __name__ == '__main__':
+    '''
     parser = ArgumentParser(
         description='Main ODQA script')
     parser.add_argument(
@@ -114,7 +130,8 @@ if __name__ == '__main__':
 
     # Parse given arguments
     args = parser.parse_args()
+    '''
 
     # Call main()
-    main(embedding_matrix=args.embeddings, encoded_corpora=args.data)
-    #main(embedding_matrix='embedding_matrix.pkl', encoded_corpora='outputs_numpy_encoding_v2')
+    #main(embedding_matrix=args.embeddings, encoded_corpora=args.data)
+    main(embedding_matrix='embedding_matrix.pkl', encoded_corpora='outputs_numpy_encoding_v2')

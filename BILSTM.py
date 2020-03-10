@@ -44,3 +44,5 @@ def attention(question, context):
     #is h_tP already H_P?
     H_P = h_tP # for now
     return H_P
+
+

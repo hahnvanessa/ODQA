@@ -1,6 +1,6 @@
 import torch
 from torch.utils.data import Dataset, DataLoader
-import numpy as
+import numpy as np
 
 MAX_SEQUENCE_LENGTH = 100
 
@@ -78,7 +78,7 @@ class Question_Answer_Set(Dataset):
         # Find the words that also appear in the question
         common_words = np.isin(context, question).astype(int)
         # Convert to LongTensor
-        return torch.from_numpy(common_words).type(torch.LongTensor)
+        return torch.from_numpy(common_words).type(torch.FloatTensor).view(-1, 1)
 
 
     def __getitem__(self, index):
@@ -92,9 +92,19 @@ class Question_Answer_Set(Dataset):
         question, q_id = self.get_question(index)
         context = self.get_context(index)
         answer = self.get_answer(index)
-        common_word_encoding =  self.common_word_encoding_list[index]
+        common_word_encoding = self.common_word_encoding_list[index]
         return question, context, answer, self.determine_length(question), self.determine_length(context), self.determine_length(answer), q_id, common_word_encoding
 
+
+    def set_max_len(self, max_len):
+        '''
+        EXPERIMENTAL
+        todo: Delete if necessary
+        Manually reduces the maximum number of datapoints the DataLoader can retrieve.
+        :param max_len:
+        :return:
+        '''
+        self.set_len = max_len
 
     def __len__(self):
         return self.set_len
