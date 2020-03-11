@@ -43,29 +43,40 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
     qp_bilstm = BiLSTM(embedding_matrix, embedding_dim=300, hidden_dim=100,
                 batch_size=batch_size)
     G_bilstm = nn.LSTM(input_size=400, hidden_size=100, bidirectional=True)
+    sq_bilstm = BiLSTM(embedding_matrix, embedding_dim=300, hidden_dim=100,
+                batch_size=batch_size) #is embedding dim correct? d_w
 
 
     for epoch in range(num_epochs):
 
         for batch_number, data in enumerate(train_loader):
             questions, contexts, answers, q_len, c_len, a_len, q_id, common_word_encodings = data
+
+            # Part 1 - Candidate Extraction
             # Question and Passage Representation
+            print('Generating question and passage representations...')
             q_representation = qp_bilstm.forward(questions, sentence_lengths=q_len)
             c_representation = qp_bilstm.forward(contexts, sentence_lengths=c_len)
             # Question and Passage Interaction
+            print('Generating interaction representations...')
             HP_attention = attention(q_representation, c_representation)
             G_input = torch.cat((c_representation, HP_attention), 2)
             G_ps, _ = G_bilstm.forward(G_input)
-
+            print('Calculating Candidate Scores...')
             scores = []  # store all candidate scores for each context for the current question
             for G_p in G_ps:
                 # create a new Candidate Scorer for each context
                 C_scores = candidate_scoring.Candidate_Scorer(G_p).candidate_probabilities()  # candidate scores for current context
                 scores.append(C_scores)
             # if we create only one candidate scorer instance before (e.g. one for each question or one for all questions), we need to change the G_p argument
-            print('scores', scores)
 
+            # Part 2 - Answer Selection
             # Question Representation
+            print('Generating Condensed Question representations...')
+            print('quesions', questions.shape)
+            S_q = sq_bilstm.forward(questions, sentence_lengths=q_len)  #torch.Size([100, 100, 200])
+            # Max pooling -> Condensed question representation
+            r_q = sq_bilstm.max_pooling(S_q) #torch.Size([100, 100, 1])
 
 
             # Passage Representation
