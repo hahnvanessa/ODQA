@@ -9,6 +9,8 @@ import question_answer_set
 from torch.utils.data import Dataset, DataLoader
 import question_answer_set as qas
 import candidate_scoring
+from torch.nn.utils.rnn import pack_padded_sequence as pack
+from torch.nn.utils.rnn import pad_packed_sequence as unpack
 
 MAX_SEQUENCE_LENGTH = 100
 
@@ -43,12 +45,19 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
     qp_bilstm = BiLSTM(embedding_matrix, embedding_dim=300, hidden_dim=100,
                 batch_size=batch_size)
     G_bilstm = nn.LSTM(input_size=400, hidden_size=100, bidirectional=True)
+    sq_bilstm = BiLSTM(embedding_matrix, embedding_dim=300, hidden_dim=100,
+                       batch_size=batch_size)  # is embedding dim correct? d_w, #fg: yes
+    sp_v1_bilstm = nn.LSTM(input_size=202, hidden_size=100, bidirectional=True)  # todo: padding function?
+    sp_v2_bilstm = nn.LSTM(input_size=401, hidden_size=100, bidirectional=True) #todo: padding function?
+
 
 
     for epoch in range(num_epochs):
 
         for batch_number, data in enumerate(train_loader):
             questions, contexts, answers, q_len, c_len, a_len, q_id, common_word_encodings = data
+            print('Started candidate extraction...')
+            # Part 1 - Candidate Extraction
             # Question and Passage Representation
             q_representation = qp_bilstm.forward(questions, sentence_lengths=q_len)
             c_representation = qp_bilstm.forward(contexts, sentence_lengths=c_len)
@@ -63,31 +72,42 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
                 C_scores = candidate_scoring.Candidate_Scorer(G_p).candidate_probabilities()  # candidate scores for current context
                 scores.append(C_scores)
             # if we create only one candidate scorer instance before (e.g. one for each question or one for all questions), we need to change the G_p argument
-            print('scores', scores)
 
-            # Question Representation
+            # Question Representation (Condensed Question)
 
+            print('Started Answer Selection...')
+            print('Generating Condensed Question representations...')
 
+            # VERSION 1: VERTICAL MAX POOLING
+            S_q = sq_bilstm.forward(questions, sentence_lengths=q_len)  # torch.Size([100, 100, 200])
+            # Max pooling -> Condensed question representation
+            r_q = sq_bilstm.max_pooling(S_q)  # torch.Size([100, 100, 1])
             # Passage Representation
-            S_q = qp_bilstm.forward(questions, sentence_lengths=q_len)
-            mxp = nn.MaxPool2d((100, 1), stride=1) # do i need to address packing here, 0 will be deleted anyways, # Warning this assumes (#batchsize, #num_tokens, #embedding_dim), while it may be (#bs, #e_d, #n_t)
+            w_emb = qp_bilstm.forward(contexts, sentence_lengths=c_len)  # Can we reuse the previous c_representations?
+            cwe = common_word_encodings
+            # Concatenation
+            R_p = torch.cat((w_emb, cwe), 2)
+            R_p = torch.cat((R_p, r_q), 2)  # (100,100,401)
+            # todo: should we really pack here? If yes move packing to a different script
+            packed_R_p = pack(R_p, c_len, batch_first=True, enforce_sorted=False)
+            S_p, _ = sp_v1_bilstm.forward(packed_R_p)  # (100,100,200)
+
+            '''
+            # VERSION 2: HORIZONTAL MAX POOLING
+            S_q = sq_bilstm.forward(questions, sentence_lengths=q_len)
+            # todo: move following to bilstm.py if we keep it, otherwise delete it
+            mxp = nn.MaxPool2d((MAX_SEQUENCE_LENGTH, 1),stride=1)
             r_q = mxp(S_q) #(100, 1, 200)
+            # Passage Representation
             w_emb = qp_bilstm.forward(contexts, sentence_lengths=c_len) #Can we reuse the previous c_representations?
             cwe = common_word_encodings
-
-            # Concatenation operation
-            print(w_emb.shape, cwe.shape)
+            # Concatenation
             R_p = torch.cat((w_emb, cwe), 2)
-            # Check the following with Stalin!
-            R_p = torch.cat((R_p, cwe.extend(batch_size, -1, 200)), 2)
-            print(R_p.shape)
-            print(w_emb.shape, r_q.shape, cwe.shape)
-            input()
-            # Recshape operation
-
-            #todo word embeddings
-            #todo question independent representation
-
+            R_p = torch.cat((R_p, r_q.expand(batch_size, MAX_SEQUENCE_LENGTH, 200)), 2) #(100,100,401)
+            # todo: should we really pack here? If yes move packing to a different script
+            packed_R_p = pack(R_p, c_len, batch_first=True, enforce_sorted=False)
+            S_p, _ = sp_v2_bilstm.forward(packed_R_p) #(100,100,200)
+            '''
 
             # Candidate Representation
 
