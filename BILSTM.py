@@ -17,7 +17,7 @@ class BiLSTM(nn.Module):
         self.embedding = nn.Embedding.from_pretrained(torch.FloatTensor(self.embeddings))
         self.dropout = dropout #try without dropout too and with different p
         self.bilstm = nn.LSTM(input_size=embedding_dim, hidden_size=hidden_dim, dropout=self.dropout, bidirectional=True)
-
+        self.maxpool = nn.MaxPool1d(200)  # kernel size is length of sequence
         #self.hidden2label = nn.Linear(hidden_dim, ?) #define second dimension - target length k?
 
     def forward(self, sentence, sentence_lengths):
@@ -27,9 +27,9 @@ class BiLSTM(nn.Module):
         lstm_out, lstm_out_lengths = unpack(lstm_out, total_length=100)
         return lstm_out
 
-    #create another def attention to use in forward function
-    #create main.py to loop over the data points and feed into BILSTM
-
+    def max_pooling(self, input_tensor):
+        r_q = self.maxpool(input_tensor)
+        return r_q
 
 def attention(question, context):
     # assuming that input for question and context has dim 54x300 respectively and not 54x1x300
@@ -44,3 +44,4 @@ def attention(question, context):
     #is h_tP already H_P?
     H_P = h_tP # for now
     return H_P
+
