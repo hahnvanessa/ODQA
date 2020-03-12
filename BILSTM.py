@@ -18,7 +18,6 @@ class BiLSTM(nn.Module):
         self.dropout = dropout #try without dropout too and with different p
         self.bilstm = nn.LSTM(input_size=embedding_dim, hidden_size=hidden_dim, dropout=self.dropout, bidirectional=True)
         self.maxpool = nn.MaxPool1d(200)  # kernel size is length of sequence
-
         #self.hidden2label = nn.Linear(hidden_dim, ?) #define second dimension - target length k?
 
     def forward(self, sentence, sentence_lengths):
@@ -45,5 +44,4 @@ def attention(question, context):
     #is h_tP already H_P?
     H_P = h_tP # for now
     return H_P
-
 
