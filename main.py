@@ -140,7 +140,7 @@ def main(embedding_matrix, encoded_corpora):
             batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10)
 
 if __name__ == '__main__':
-    '''
+
     parser = ArgumentParser(
         description='Main ODQA script')
     parser.add_argument(
@@ -150,8 +150,8 @@ if __name__ == '__main__':
 
     # Parse given arguments
     args = parser.parse_args()
-    '''
+
 
     # Call main()
-    #main(embedding_matrix=args.embeddings, encoded_corpora=args.data)
-    main(embedding_matrix='embedding_matrix.pkl', encoded_corpora='outputs_numpy_encoding_v2')
+    main(embedding_matrix=args.embeddings, encoded_corpora=args.data)
+    #main(embedding_matrix='embedding_matrix.pkl', encoded_corpora='outputs_numpy_encoding_v2')
