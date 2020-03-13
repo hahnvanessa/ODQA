@@ -13,6 +13,7 @@ from torch.nn.utils.rnn import pack_padded_sequence as pack
 from torch.nn.utils.rnn import pad_packed_sequence as unpack
 
 MAX_SEQUENCE_LENGTH = 100
+K = 2
 
 def get_file_paths(data_dir):
     # Get paths for all files in the given directory
@@ -90,7 +91,7 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
             R_p = torch.cat((R_p, r_q), 2)  # (100,100,401)
             # todo: should we really pack here? If yes move packing to a different script
             packed_R_p = pack(R_p, c_len, batch_first=True, enforce_sorted=False)
-            S_p, _ = sp_v1_bilstm.forward(packed_R_p)  # (100,100,200)
+            S_ps, _ = sp_v1_bilstm.forward(packed_R_p)  # (100,100,200)
 
             '''
             # VERSION 2: HORIZONTAL MAX POOLING
@@ -110,8 +111,15 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
             '''
 
             # Candidate Representation
-
-
+            for score in scores:
+                # get K biggest scores from the flattened score tensor
+                flattened = torch.flatten(score)
+                max_values, _ = torch.topk(flattened, K)
+                for value in max_values:
+                    # find the indicies of the max value in the original tensor
+                    idx = (scores == value).nonzero()
+                    # extract the span
+                    span = idx[:, 1:3]
 
 
 def main(embedding_matrix, encoded_corpora):
