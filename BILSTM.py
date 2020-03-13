@@ -21,6 +21,9 @@ class BiLSTM(nn.Module):
 
         #self.hidden2label = nn.Linear(hidden_dim, ?) #define second dimension - target length k?
 
+    def embed(self, sentence):
+        return self.embedding(sentence)
+
     def forward(self, sentence, sentence_lengths):
         packed_x = pack(self.embedding(sentence), sentence_lengths, batch_first=True, enforce_sorted=False)
         #packed_x = packed_x.view(self.batch_size, self.hidden_dim, self.embedding_dim) # https://blog.floydhub.com/long-short-term-memory-from-zero-to-hero-with-pytorch/

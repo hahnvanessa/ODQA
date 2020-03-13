@@ -47,8 +47,8 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
     G_bilstm = nn.LSTM(input_size=400, hidden_size=100, bidirectional=True)
     sq_bilstm = BiLSTM(embedding_matrix, embedding_dim=300, hidden_dim=100,
                        batch_size=batch_size)  # is embedding dim correct? d_w, #fg: yes
-    sp_v1_bilstm = nn.LSTM(input_size=202, hidden_size=100, bidirectional=True)  # todo: padding function?
-    sp_v2_bilstm = nn.LSTM(input_size=401, hidden_size=100, bidirectional=True) #todo: padding function?
+    sp_v1_bilstm = nn.LSTM(input_size=302, hidden_size=100, bidirectional=True)  # todo: padding function?
+    sp_v2_bilstm = nn.LSTM(input_size=501, hidden_size=100, bidirectional=True) #todo: padding function?
 
 
 
@@ -83,7 +83,7 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
             # Max pooling -> Condensed question representation
             r_q = sq_bilstm.max_pooling(S_q)  # torch.Size([100, 100, 1])
             # Passage Representation
-            w_emb = qp_bilstm.forward(contexts, sentence_lengths=c_len)  # Can we reuse the previous c_representations?
+            w_emb = qp_bilstm.embed(contexts)  # Can we reuse the previous c_representations?
             cwe = common_word_encodings
             # Concatenation
             R_p = torch.cat((w_emb, cwe), 2)
@@ -99,10 +99,12 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
             mxp = nn.MaxPool2d((MAX_SEQUENCE_LENGTH, 1),stride=1)
             r_q = mxp(S_q) #(100, 1, 200)
             # Passage Representation
-            w_emb = qp_bilstm.forward(contexts, sentence_lengths=c_len) #Can we reuse the previous c_representations?
+            w_emb = qp_bilstm.embed(contexts)
             cwe = common_word_encodings
+            print('w_emb shape', w_emb.shape, 'cwe', cwe.shape)
             # Concatenation
             R_p = torch.cat((w_emb, cwe), 2)
+            print('R_p shape', R_p.shape, 'r_q shape', r_q.shape)
             R_p = torch.cat((R_p, r_q.expand(batch_size, MAX_SEQUENCE_LENGTH, 200)), 2) #(100,100,401)
             # todo: should we really pack here? If yes move packing to a different script
             packed_R_p = pack(R_p, c_len, batch_first=True, enforce_sorted=False)
@@ -140,7 +142,7 @@ def main(embedding_matrix, encoded_corpora):
             batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10)
 
 if __name__ == '__main__':
-
+    '''
     parser = ArgumentParser(
         description='Main ODQA script')
     parser.add_argument(
@@ -150,8 +152,8 @@ if __name__ == '__main__':
 
     # Parse given arguments
     args = parser.parse_args()
-
+    '''
 
     # Call main()
-    main(embedding_matrix=args.embeddings, encoded_corpora=args.data)
-    #main(embedding_matrix='embedding_matrix.pkl', encoded_corpora='outputs_numpy_encoding_v2')
+    #main(embedding_matrix=args.embeddings, encoded_corpora=args.data)
+    main(embedding_matrix='embedding_matrix.pkl', encoded_corpora='outputs_numpy_encoding_v2')
