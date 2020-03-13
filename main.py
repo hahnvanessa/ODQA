@@ -13,6 +13,7 @@ from torch.nn.utils.rnn import pack_padded_sequence as pack
 from torch.nn.utils.rnn import pad_packed_sequence as unpack
 
 MAX_SEQUENCE_LENGTH = 100
+K = 2
 
 def get_file_paths(data_dir):
     # Get paths for all files in the given directory
@@ -75,7 +76,6 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
             # Part 2 - Answer Selection
             # Question Representation (Condensed Question)
             print('Started Answer Selection...')
-            # Horizontal Max Pooling
             S_q = sq_bilstm.forward(questions, sentence_lengths=q_len)
             r_q = max_pooling(S_q, MAX_SEQUENCE_LENGTH) #(100, 1, 200)
             # Passage Representation
@@ -86,9 +86,31 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
             S_p, _ = sp_bilstm.forward(packed_R_p) #(100,100,200)
 
 
+            spans = []
             # Candidate Representation
+            for score in scores:
+                # get K biggest scores from the flattened score tensor
+                flattened = torch.flatten(score)
+                max_values, _ = torch.topk(flattened, K)
+                p_spans = []
+                for value in max_values:
+                    # find the indicies of the max value in the original tensor
+                    idx = (scores == value).nonzero()
+                    # extract the span
+                    span = idx[:, 1:3][0].tolist()
+                    p_spans.append(span)
+                spans.append(p_spans)
 
-
+            # Extract spans from the passage representation
+            S_cs = []
+            for i, S_p in enumerate(S_ps):
+                c_spans = spans[i]
+                # candidates for one passage
+                S_c_p = []
+                for c_span in c_spans:
+                    S_c = S_p[c_span[0]:c_span[1]+1, :]
+                    S_c_p.append(S_c)
+                S_cs.append(S_c_p)
 
 def main(embedding_matrix, encoded_corpora):
     '''
