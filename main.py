@@ -110,16 +110,33 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
             S_p, _ = sp_v2_bilstm.forward(packed_R_p) #(100,100,200)
             '''
 
+            spans = []
             # Candidate Representation
             for score in scores:
                 # get K biggest scores from the flattened score tensor
                 flattened = torch.flatten(score)
                 max_values, _ = torch.topk(flattened, K)
+                p_spans = []
                 for value in max_values:
                     # find the indicies of the max value in the original tensor
                     idx = (scores == value).nonzero()
                     # extract the span
-                    span = idx[:, 1:3]
+                    span = idx[:, 1:3][0].tolist()
+                    p_spans.append(span)
+                spans.append(p_spans)
+
+            # Extract spans from the passage representation
+            S_cs = []
+            for i, S_p in enumerate(S_ps):
+                c_spans = spans[i]
+                # candidates for one passage
+                S_c_p = []
+                for c_span in c_spans:
+                    S_c = S_p[c_span[0]:c_span[1]+1, :]
+                    S_c_p.append(S_c)
+                S_cs.append(S_c_p)
+
+
 
 
 def main(embedding_matrix, encoded_corpora):
