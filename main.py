@@ -1,5 +1,5 @@
 from argparse import ArgumentParser
-from BILSTM import BiLSTM, attention
+from BILSTM import BiLSTM, attention, max_pooling
 import os
 import pickle
 from torch import nn
@@ -47,8 +47,7 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
     G_bilstm = nn.LSTM(input_size=400, hidden_size=100, bidirectional=True)
     sq_bilstm = BiLSTM(embedding_matrix, embedding_dim=300, hidden_dim=100,
                        batch_size=batch_size)  # is embedding dim correct? d_w, #fg: yes
-    sp_v1_bilstm = nn.LSTM(input_size=302, hidden_size=100, bidirectional=True)  # todo: padding function?
-    sp_v2_bilstm = nn.LSTM(input_size=501, hidden_size=100, bidirectional=True) #todo: padding function?
+    sp_bilstm = nn.LSTM(input_size=501, hidden_size=100, bidirectional=True) #todo: padding function?
 
 
 
@@ -73,46 +72,21 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
                 scores.append(C_scores)
             # if we create only one candidate scorer instance before (e.g. one for each question or one for all questions), we need to change the G_p argument
 
+            # Part 2 - Answer Selection
             # Question Representation (Condensed Question)
-
             print('Started Answer Selection...')
-            print('Generating Condensed Question representations...')
-
-            # VERSION 1: VERTICAL MAX POOLING
-            S_q = sq_bilstm.forward(questions, sentence_lengths=q_len)  # torch.Size([100, 100, 200])
-            # Max pooling -> Condensed question representation
-            r_q = sq_bilstm.max_pooling(S_q)  # torch.Size([100, 100, 1])
-            # Passage Representation
-            w_emb = qp_bilstm.embed(contexts)  # Can we reuse the previous c_representations?
-            cwe = common_word_encodings
-            # Concatenation
-            R_p = torch.cat((w_emb, cwe), 2)
-            R_p = torch.cat((R_p, r_q), 2)  # (100,100,401)
-            # todo: should we really pack here? If yes move packing to a different script
-            packed_R_p = pack(R_p, c_len, batch_first=True, enforce_sorted=False)
-            S_p, _ = sp_v1_bilstm.forward(packed_R_p)  # (100,100,200)
-
-            '''
-            # VERSION 2: HORIZONTAL MAX POOLING
+            # Horizontal Max Pooling
             S_q = sq_bilstm.forward(questions, sentence_lengths=q_len)
-            # todo: move following to bilstm.py if we keep it, otherwise delete it
-            mxp = nn.MaxPool2d((MAX_SEQUENCE_LENGTH, 1),stride=1)
-            r_q = mxp(S_q) #(100, 1, 200)
+            r_q = max_pooling(S_q, MAX_SEQUENCE_LENGTH) #(100, 1, 200)
             # Passage Representation
-            w_emb = qp_bilstm.embed(contexts)
-            cwe = common_word_encodings
-            print('w_emb shape', w_emb.shape, 'cwe', cwe.shape)
-            # Concatenation
-            R_p = torch.cat((w_emb, cwe), 2)
-            print('R_p shape', R_p.shape, 'r_q shape', r_q.shape)
-            R_p = torch.cat((R_p, r_q.expand(batch_size, MAX_SEQUENCE_LENGTH, 200)), 2) #(100,100,401)
-            # todo: should we really pack here? If yes move packing to a different script
+            w_emb = qp_bilstm.embed(contexts) # word embeddings (100,100,300)
+            R_p = torch.cat((w_emb, common_word_encodings), 2)
+            R_p = torch.cat((R_p, r_q.expand(batch_size, MAX_SEQUENCE_LENGTH, 200)), 2) #(100,100,501)
             packed_R_p = pack(R_p, c_len, batch_first=True, enforce_sorted=False)
-            S_p, _ = sp_v2_bilstm.forward(packed_R_p) #(100,100,200)
-            '''
+            S_p, _ = sp_bilstm.forward(packed_R_p) #(100,100,200)
+
 
             # Candidate Representation
-
 
 
 
