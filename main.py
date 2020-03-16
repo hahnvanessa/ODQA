@@ -1,5 +1,5 @@
 from argparse import ArgumentParser
-from BILSTM import BiLSTM, attention
+from BILSTM import BiLSTM, attention, max_pooling
 import os
 import pickle
 from torch import nn
@@ -9,8 +9,11 @@ import question_answer_set
 from torch.utils.data import Dataset, DataLoader
 import question_answer_set as qas
 import candidate_scoring
+from torch.nn.utils.rnn import pack_padded_sequence as pack
+from torch.nn.utils.rnn import pad_packed_sequence as unpack
 
 MAX_SEQUENCE_LENGTH = 100
+K = 2
 
 def get_file_paths(data_dir):
     # Get paths for all files in the given directory
@@ -44,25 +47,25 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
                 batch_size=batch_size)
     G_bilstm = nn.LSTM(input_size=400, hidden_size=100, bidirectional=True)
     sq_bilstm = BiLSTM(embedding_matrix, embedding_dim=300, hidden_dim=100,
-                batch_size=batch_size) #is embedding dim correct? d_w
+                       batch_size=batch_size)  # is embedding dim correct? d_w, #fg: yes
+    sp_bilstm = nn.LSTM(input_size=501, hidden_size=100, bidirectional=True) #todo: padding function?
+
 
 
     for epoch in range(num_epochs):
 
         for batch_number, data in enumerate(train_loader):
             questions, contexts, answers, q_len, c_len, a_len, q_id, common_word_encodings = data
-
+            print('Started candidate extraction...')
             # Part 1 - Candidate Extraction
             # Question and Passage Representation
-            print('Generating question and passage representations...')
             q_representation = qp_bilstm.forward(questions, sentence_lengths=q_len)
             c_representation = qp_bilstm.forward(contexts, sentence_lengths=c_len)
             # Question and Passage Interaction
-            print('Generating interaction representations...')
             HP_attention = attention(q_representation, c_representation)
             G_input = torch.cat((c_representation, HP_attention), 2)
             G_ps, _ = G_bilstm.forward(G_input)
-            print('Calculating Candidate Scores...')
+
             scores = []  # store all candidate scores for each context for the current question
             for G_p in G_ps:
                 # create a new Candidate Scorer for each context
@@ -71,24 +74,43 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
             # if we create only one candidate scorer instance before (e.g. one for each question or one for all questions), we need to change the G_p argument
 
             # Part 2 - Answer Selection
-            # Question Representation
-            print('Generating Condensed Question representations...')
-            print('quesions', questions.shape)
-            S_q = sq_bilstm.forward(questions, sentence_lengths=q_len)  #torch.Size([100, 100, 200])
-            # Max pooling -> Condensed question representation
-            r_q = sq_bilstm.max_pooling(S_q) #torch.Size([100, 100, 1])
-
-
+            # Question Representation (Condensed Question)
+            print('Started Answer Selection...')
+            S_q = sq_bilstm.forward(questions, sentence_lengths=q_len)
+            r_q = max_pooling(S_q, MAX_SEQUENCE_LENGTH) #(100, 1, 200)
             # Passage Representation
-            cwe = common_word_encodings
-            #todo word embeddings
-            #todo question independent representation
+            w_emb = qp_bilstm.embed(contexts) # word embeddings (100,100,300)
+            R_p = torch.cat((w_emb, common_word_encodings), 2)
+            R_p = torch.cat((R_p, r_q.expand(batch_size, MAX_SEQUENCE_LENGTH, 200)), 2) #(100,100,501)
+            packed_R_p = pack(R_p, c_len, batch_first=True, enforce_sorted=False)
+            S_p, _ = sp_bilstm.forward(packed_R_p) #(100,100,200)
 
 
+            spans = []
             # Candidate Representation
+            for score in scores:
+                # get K biggest scores from the flattened score tensor
+                flattened = torch.flatten(score)
+                max_values, _ = torch.topk(flattened, K)
+                p_spans = []
+                for value in max_values:
+                    # find the indicies of the max value in the original tensor
+                    idx = (scores == value).nonzero()
+                    # extract the span
+                    span = idx[:, 1:3][0].tolist()
+                    p_spans.append(span)
+                spans.append(p_spans)
 
-
-
+            # Extract spans from the passage representation
+            S_cs = []
+            for i, S_p in enumerate(S_ps):
+                c_spans = spans[i]
+                # candidates for one passage
+                S_c_p = []
+                for c_span in c_spans:
+                    S_c = S_p[c_span[0]:c_span[1]+1, :]
+                    S_c_p.append(S_c)
+                S_cs.append(S_c_p)
 
 def main(embedding_matrix, encoded_corpora):
     '''
@@ -116,6 +138,7 @@ def main(embedding_matrix, encoded_corpora):
             batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10)
 
 if __name__ == '__main__':
+    '''
     parser = ArgumentParser(
         description='Main ODQA script')
     parser.add_argument(
@@ -125,7 +148,8 @@ if __name__ == '__main__':
 
     # Parse given arguments
     args = parser.parse_args()
+    '''
 
     # Call main()
-    main(embedding_matrix=args.embeddings, encoded_corpora=args.data)
-    #main(embedding_matrix='embedding_matrix.pkl', encoded_corpora='outputs_numpy_encoding_v2')
+    #main(embedding_matrix=args.embeddings, encoded_corpora=args.data)
+    main(embedding_matrix='embedding_matrix.pkl', encoded_corpora='outputs_numpy_encoding_v2')

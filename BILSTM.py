@@ -17,7 +17,10 @@ class BiLSTM(nn.Module):
         self.embedding = nn.Embedding.from_pretrained(torch.FloatTensor(self.embeddings))
         self.dropout = dropout #try without dropout too and with different p
         self.bilstm = nn.LSTM(input_size=embedding_dim, hidden_size=hidden_dim, dropout=self.dropout, bidirectional=True)
-        self.maxpool = nn.MaxPool1d(200) #kernel size is length of sequence
+        #self.hidden2label = nn.Linear(hidden_dim, ?) #define second dimension - target length k?
+
+    def embed(self, sentence):
+        return self.embedding(sentence)
 
     def forward(self, sentence, sentence_lengths):
         packed_x = pack(self.embedding(sentence), sentence_lengths, batch_first=True, enforce_sorted=False)
@@ -26,15 +29,13 @@ class BiLSTM(nn.Module):
         lstm_out, lstm_out_lengths = unpack(lstm_out, total_length=100)
         return lstm_out
 
-    def max_pooling(self, input_tensor):
-        r_q = self.maxpool(input_tensor)
-        return r_q
-
-
+def max_pooling(input_tensor, max_sequence_length):
+    # Not in BiLSTM because as of now the BiLSTM class only works for embedding inputs
+    mxp = nn.MaxPool2d((max_sequence_length, 1),stride=1)
+    return mxp(input_tensor)
 
 def attention(question, context):
     # assuming that input for question and context has dim 54x300 respectively and not 54x1x300
-    print(question.shape, context.shape)
     numerator = torch.exp(torch.bmm(question, torch.transpose(context, 1, 2)))
     denominator = torch.sum(numerator) #index 0?
     alpha_tk = torch.div(numerator,denominator) #->dim 54,54
