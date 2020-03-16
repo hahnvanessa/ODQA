@@ -70,7 +70,11 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
             for G_p in G_ps:
                 # create a new Candidate Scorer for each context
                 C_scores = candidate_scoring.Candidate_Scorer(G_p).candidate_probabilities()  # candidate scores for current context
+                # set the lower diagonal values to 0
+                C_scores = torch.triu(C_scores)
                 scores.append(C_scores)
+            scores = torch.stack(scores, dim=0)
+
             # if we create only one candidate scorer instance before (e.g. one for each question or one for all questions), we need to change the G_p argument
 
             # Part 2 - Answer Selection
