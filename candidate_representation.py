@@ -9,6 +9,11 @@ class Candidate_Represenation():
         self.scores = scores
         self.wb = torch.randn(100, 200)
         self.we = torch.randn(100, 200)
+        # Linear transformations to capture the intensity
+        # of each interaction (used for the attention mechanism)
+        self.wc = torch.Linear(100, 100)
+        self.wo = torch.Linear(100, 100)
+        self.wv = torch.Linear(1, 100)
 
     def extract_spans(self):
 
@@ -40,3 +45,15 @@ class Candidate_Represenation():
         return r_c
 
 
+    def calculate_correlations(self, rc, rcm):
+        # Model the interactions via attention mechanism
+
+        # TODO: form a matrix V for all candidates
+        # TODO: form rcm (condensed vector representation of all
+        # candidates except for the current one (rc))
+
+        c = torch.bmm(self.wc, rc)
+        o = torch.bmm(self.wo, rcm)
+        V_jm = torch.bmm(self.wv, nn.Tanh(torch.add(c, o)))
+
+        return V_jm
