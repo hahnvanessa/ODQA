@@ -11,9 +11,10 @@ import question_answer_set as qas
 import candidate_scoring
 from torch.nn.utils.rnn import pack_padded_sequence as pack
 from torch.nn.utils.rnn import pad_packed_sequence as unpack
+from candidate_representation import Candidate_Represenation
 
 MAX_SEQUENCE_LENGTH = 100
-K = 2
+K = 2 # Number of extracted candidates per passage
 
 def get_file_paths(data_dir):
     # Get paths for all files in the given directory
@@ -57,7 +58,7 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
         for batch_number, data in enumerate(train_loader):
             questions, contexts, answers, q_len, c_len, a_len, q_id, common_word_encodings = data
             print('Started candidate extraction...')
-            # Part 1 - Candidate Extraction
+            # region Part 1 - Candidate Extraction
             # Question and Passage Representation
             q_representation = qp_bilstm.forward(questions, sentence_lengths=q_len)
             c_representation = qp_bilstm.forward(contexts, sentence_lengths=c_len)
@@ -65,17 +66,13 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
             HP_attention = attention(q_representation, c_representation)
             G_input = torch.cat((c_representation, HP_attention), 2)
             G_ps, _ = G_bilstm.forward(G_input)
-
-            scores = []  # store all candidate scores for each context for the current question
+            C_spans = []  # (100x2x2)
             for G_p in G_ps:
-                # create a new Candidate Scorer for each context
-                C_scores = candidate_scoring.Candidate_Scorer(G_p).candidate_probabilities()  # candidate scores for current context
-                # set the lower diagonal values to 0
-                C_scores = torch.triu(C_scores)
-                scores.append(C_scores)
-            scores = torch.stack(scores, dim=0)
-
+                # Store the spans of the top k candidates in the passage
+                C_spans.append(candidate_scoring.Candidate_Scorer(G_p).candidate_probabilities(K))  # candidate scores for current context
+            C_spans = torch.stack(C_spans, dim=0)
             # if we create only one candidate scorer instance before (e.g. one for each question or one for all questions), we need to change the G_p argument
+            # endregion
 
             # Part 2 - Answer Selection
             # Question Representation (Condensed Question)
@@ -87,7 +84,14 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
             R_p = torch.cat((w_emb, common_word_encodings), 2)
             R_p = torch.cat((R_p, r_q.expand(batch_size, MAX_SEQUENCE_LENGTH, 200)), 2) #(100,100,501)
             packed_R_p = pack(R_p, c_len, batch_first=True, enforce_sorted=False)
-            S_p, _ = sp_bilstm.forward(packed_R_p) #(100,100,200)
+            S_p, _ = sp_bilstm.forward(packed_R_p)
+            S_p, _ = unpack(S_p, total_length=MAX_SEQUENCE_LENGTH)  #(100,100,200)
+            input(S_p.shape)
+
+            # Candidate Represention
+            # todo: Do we need to share the weights among the Candidate Rep classes? (Same goes for candidate scores?)
+            C_rep = Candidate_Represenation(S_p, C_spans, k=K)
+            input()
 
 def main(embedding_matrix, encoded_corpora):
     '''

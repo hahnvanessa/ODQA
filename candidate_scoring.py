@@ -14,6 +14,10 @@ class Candidate_Scorer():
 		return self.we(self.G_p)
 
 	def candidate_probabilities(self, k):
+		'''
+		Returns the start and end indices of the top k candidates within a single
+		context.
+		'''
 		b_P = self.begin_scores() #target vector 1x100
 		e_P = self.end_scores() #target vector 1x100
 		numerator = torch.exp(b_P + e_P.transpose(0,1))
