@@ -26,5 +26,5 @@ class Candidate_Scorer():
 		H, W = upper_diagonal.shape
 		flattened = upper_diagonal.view(-1) #flatten to get top k scores of entire tensor
 		k_max_values, flattened_indices = flattened.topk(k)
-		orig_indices = torch.cat(((indices // W).unsqueeze(1), (indices % W).unsqueeze(1)), dim=1) #get indices from original, not flattened tensor
+		orig_indices = torch.cat(((flattened_indices // W).unsqueeze(1), (flattened_indices  % W).unsqueeze(1)), dim=1) #get indices from original, not flattened tensor
 		return orig_indices
