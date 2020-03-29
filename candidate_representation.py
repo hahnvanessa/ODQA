@@ -45,15 +45,20 @@ class Candidate_Represenation():
         return r_c
 
 
-    def calculate_correlations(self, rc, rcm):
+    def calculate_correlations(self):
         # Model the interactions via attention mechanism
 
-        # TODO: form a matrix V for all candidates
-        # TODO: form rcm (condensed vector representation of all
-        # candidates except for the current one (rc))
+        r_Cs = torch.split(self.rC, 100, dim=0) # TODO: check the dimensions
 
-        c = torch.bmm(self.wc, rc)
-        o = torch.bmm(self.wo, rcm)
-        V_jm = torch.bmm(self.wv, nn.Tanh(torch.add(c, o)))
+        V_jms = []
 
-        return V_jm
+        for i, r_Cs in enumerate(r_Cs):
+            rcm = torch.cat([r_Cs[0:i], r_Cs[i+1:]], dim=1)
+            c = torch.bmm(self.wc, r_Cs)
+            o = torch.bmm(self.wo, rcm)
+            V_jm = torch.bmm(self.wv, torch.add(c, o).tahn())
+            V_jms.append(V_jm)
+
+        V = torch.stack(V_jms, dim=0)
+
+        return V
