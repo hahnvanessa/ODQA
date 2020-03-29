@@ -14,6 +14,10 @@ class Candidate_Scorer():
 		return self.we(self.G_p)
 
 	def candidate_probabilities(self, k):
+		'''
+		Returns the start and end indices of the top k candidates within a single
+		context.
+		'''
 		b_P = self.begin_scores() #target vector 1x100
 		e_P = self.end_scores() #target vector 1x100
 		numerator = torch.exp(b_P + e_P.transpose(0,1))
@@ -26,5 +30,5 @@ class Candidate_Scorer():
 		H, W = upper_diagonal.shape
 		flattened = upper_diagonal.view(-1) #flatten to get top k scores of entire tensor
 		k_max_values, flattened_indices = flattened.topk(k)
-		orig_indices = torch.cat(((indices // W).unsqueeze(1), (indices % W).unsqueeze(1)), dim=1) #get indices from original, not flattened tensor
+		orig_indices = torch.cat(((flattened_indices // W).unsqueeze(1), (flattened_indices  % W).unsqueeze(1)), dim=1) #get indices from original, not flattened tensor
 		return orig_indices
