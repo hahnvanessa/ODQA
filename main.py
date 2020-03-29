@@ -86,7 +86,7 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
             packed_R_p = pack(R_p, c_len, batch_first=True, enforce_sorted=False)
             S_p, _ = sp_bilstm.forward(packed_R_p)
             S_p, _ = unpack(S_p, total_length=MAX_SEQUENCE_LENGTH)  #(100,100,200)
-            input(S_p.shape)
+            print('shapes', S_p.shape, C_spans.shape)
 
             # Candidate Represention
             # todo: Do we need to share the weights among the Candidate Rep classes? (Same goes for candidate scores?)
