@@ -53,7 +53,7 @@ class Candidate_Represenation():
         V_jms = []
 
         for i, r_Cs in enumerate(r_Cs):
-            rcm = torch.cat([r_Cs[0:i], r_Cs[i+1:]], dim=1)
+            rcm = torch.cat([r_Cs[0:i], r_Cs[i+1:]], dim=0)
             c = torch.bmm(self.wc, r_Cs)
             o = torch.bmm(self.wo, rcm)
             V_jm = torch.bmm(self.wv, torch.add(c, o).tahn())
@@ -62,3 +62,23 @@ class Candidate_Represenation():
         V = torch.stack(V_jms, dim=0)
 
         return V
+
+
+    def generate_fused_representation(self, V):
+
+        # Normalize interactions
+
+        V_jms = torch.split(V, ..., dim=0) # TODO: check the dimensions
+
+        alpha_ms = []
+
+        for i, V_jm in enumerate(V_jms):
+            numerator = torch.exp(V_jm)
+            denominator_correlations = torch.stack([V_jms[0:i], V_jms[i:]], dim=0)
+            denominator = torch.sum(torch.exp(denominator_correlations), dim =0)
+            alpha_m = torch.div(numerator, denominator)
+            alpha_ms.append(alpha_m)
+
+        alpha = torch.stack(alpha_ms, dim=0)
+
+        # TODO: Generate fused representations
