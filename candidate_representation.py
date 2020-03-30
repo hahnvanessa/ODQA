@@ -74,7 +74,6 @@ class Candidate_Represenation():
     def generate_fused_representation(self, V):
 
         # Normalize interactions
-
         V_jms = torch.split(V, ..., dim=0) # TODO: check the dimensions
 
         alpha_ms = []
@@ -88,4 +87,18 @@ class Candidate_Represenation():
 
         alpha = torch.stack(alpha_ms, dim=0)
 
-        # TODO: Generate fused representations
+
+        # Generate fused representations
+        r_Cs = torch.split(self.rC, 100, dim=0) # TODO: check the dimensions
+
+        tilda_rсms = []
+
+        for i, r_Cs in enumerate(r_Cs):
+            rcm = torch.cat([r_Cs[0:i], r_Cs[i+1:]], dim=0)
+            tilda_rсm = torch.bmm(alpha[i], rcm)
+            tilda_rcms.append(tilda_rсm)
+
+        tilda_rcms = torch.stack(tilda_rcms, dim=0)
+        tilda_rC = torch.sum(tilda_rcms)
+
+        return tilda_rC
