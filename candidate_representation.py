@@ -100,7 +100,7 @@ class Candidate_Represenation():
             # todo: I changed this please double check. I think the sum is taken for every individual candidate so it is taken M times
             rcm = torch.cat([self.r_Cs[0:i], self.r_Cs[i+1:]], dim=0) #maybe alpha is multiplied
             alpha_m = torch.cat([alpha[0:i], alpha[i+1:]], dim=0)
-            tilda_rсm = torch.mm(alpha_m, rcm) # todo: changed from bmm to mm
+            tilda_rсm = torch.sum(torch.mm(alpha_m, rcm)) # todo: changed from bmm to mm
             tilda_rсms.append(tilda_rсm)
 
         #tilda_rcms = torch.stack(tilda_rcms, dim=0)
