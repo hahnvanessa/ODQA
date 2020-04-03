@@ -96,6 +96,8 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
             S_Cs = C_rep.S_Cs
             r_Cs = C_rep.r_Cs
             r_Ctilde = C_rep.tilda_r_Cs
+            print(S_Cs.shape, r_Cs.shape, r_Ctilde.shape)
+            input()
 
             # endregion
 
