@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+import torch.nn.functional as F
 
 
 class Candidate_Represenation():
@@ -21,36 +22,52 @@ class Candidate_Represenation():
         self.wc = torch.randn(200, 200)
         self.wo = torch.randn(200, 200)
         self.wv = torch.randn(1, 200)
-        self.r_Cs = self.calculate_condensed_vector_representation()
+        self.S_Cs, self.r_Cs = self.calculate_condensed_vector_representation()
         self.V = self.calculate_correlations()
-        self.tilda_rCs = self.generate_fused_representation()
+        self.tilda_r_Cs = self.generate_fused_representation()
 
     def calculate_condensed_vector_representation(self):
         '''
-        Returns the condensed vector representation of all start and all end tokens.
+        Returns the condensed vector representation of all candidates by condensing their start and end tokens.
         :return:
         '''
-        start_indices = self.spans[:,:,0]
-        end_indices = self.spans[:,:,1]
         sp_cb = []
         sp_ce = []
+        S_Cs = []
+        start_indices = self.spans[:, :, 0]
+        end_indices = self.spans[:, :, 1]
+        max_seq_len = self.S_p.shape[1]  # padding length
 
+        # todo: check if shape[0] really is the number of candidates
         for p in range(self.S_p.shape[0]):
-            # Appends start tokens
+            # Iterate through the candidates per passage
             for i in range(self.k):
+                # Start and end tokens of candidate
                 sp_cb.append(self.S_p[p][start_indices[p][i]]) # Candidate Nr. i start
-            # Append end tokens
-            for i in range(self.k):
                 sp_ce.append(self.S_p[p][end_indices[p][i]])
+                '''
+                Full candidate
+                Pad candidate to full length, but keep position relative to full passage
+                Example p=[a,b,c,d], c=[b,c] => S_C=[0,b,c,0]
+                '''
+                c = self.S_p[p][start_indices[p][i]:end_indices[p][i]]
+                num_start_pads = start_indices[p][i]
+                num_end_pads = max_seq_len - num_start_pads - c.shape[0]
+                S_C = F.pad(input=c, pad=(0, 0, num_start_pads, num_end_pads), mode='constant', value=0)
+                S_Cs.append(S_C)
 
+        # Stack to turn into tensor
         sp_cb = torch.stack(sp_cb, dim=0) #(200x200)
         sp_ce = torch.stack(sp_ce, dim=0) #(200x200)
+        # todo: Reshpae S_C to (200x100x100)
+        S_Cs = torch.stack(S_Cs, dim=0)
         # Calculate r_c
         # todo: warning I changed bmm
         b = torch.mm(self.wb, sp_cb) #sp_cb is
         e = torch.mm(self.we, sp_ce)
         r_Cs = torch.add(b, e).tanh()
-        return r_Cs
+
+        return S_Cs, r_Cs
 
  
 
@@ -91,6 +108,7 @@ class Candidate_Represenation():
             alpha_ms.append(alpha_m)
 
         alpha = torch.stack(alpha_ms, dim=0)
+        print(alpha.shape, 'alpha shape')
         # Generate fused representations
         #r_Cs = torch.split(self.rC, 100, dim=0) # TODO: check the dimensions
 
