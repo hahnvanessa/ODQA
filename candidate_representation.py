@@ -91,7 +91,6 @@ class Candidate_Represenation():
 
     def generate_fused_representation(self):
         # Normalize interactions
-        #V_jms = torch.split(V, ..., dim=0) # TODO: check the dimensions
 
         alpha_ms = []
         for i, V_jm in enumerate(self.V):
