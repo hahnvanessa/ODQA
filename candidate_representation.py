@@ -95,15 +95,14 @@ class Candidate_Represenation():
 
         alpha_ms = []
         for i, V_jm in enumerate(self.V):
-            numerator = torch.exp(V_jm) # (1x199)
-            denominator_correlations = torch.cat([self.V[0:i], self.V[i+1:]], dim=0) # (199x199)
-            denominator = torch.sum(torch.exp(denominator_correlations), dim=0) #1x199
-            alpha_m = torch.div(numerator, denominator) #(199x199)? <- something does not agree here
+            numerator = torch.exp(V_jm)
+            denominator_correlations = torch.cat([self.V[0:i], self.V[i+1:]], dim=0) # (200x199)
+            denominator = torch.sum(torch.exp(denominator_correlations), dim=0)
+            alpha_m = torch.div(numerator, denominator) # 199x1
             alpha_ms.append(alpha_m)
-
         alpha = torch.stack(alpha_ms, dim=0) #(200,199)
-        tilda_rсms = []
 
+        tilda_rсms = []
         for i, r_C in enumerate(self.r_Cs):
             rcm = torch.cat([self.r_Cs[0:i], self.r_Cs[i+1:]], dim=0) #maybe alpha is multiplied (199x100)
             alpha_m = torch.cat([alpha[0:i], alpha[i+1:]], dim=0) # (199x199)
