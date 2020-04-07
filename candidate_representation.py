@@ -3,7 +3,7 @@ from torch import nn
 import torch.nn.functional as F
 
 
-class Candidate_Represenation():
+class Candidate_Representation():
     '''
     Condense and interconnect candidates from different
     passages in order to improve the selection of an answer among them.
