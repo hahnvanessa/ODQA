@@ -88,11 +88,11 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
             S_p, _ = unpack(S_p, total_length=MAX_SEQUENCE_LENGTH)  #(100,100,200)
             print('shapes', S_p.shape, C_spans.shape)
 
-            # Candidate Represention
+            # Candidate Representation
             # todo: Do we need to share the weights among the multiple Candidate Rep classes? (Same goes for candidate scores?)
             # In that case we would need to make the Candidate Rep functions take inputs e.g.
             # generate_fused_representation(V). Right now the functions take these values directly from the class.
-            C_rep = Candidate_Represenation(S_p, C_spans, k=K)
+            C_rep = Candidate_Representation(S_p, C_spans, k=K)
             S_Cs = C_rep.S_Cs
             r_Cs = C_rep.r_Cs
             r_Ctilde = C_rep.tilda_r_Cs
