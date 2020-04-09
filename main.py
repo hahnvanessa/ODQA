@@ -12,6 +12,7 @@ import candidate_scoring
 from torch.nn.utils.rnn import pack_padded_sequence as pack
 from torch.nn.utils.rnn import pad_packed_sequence as unpack
 from candidate_representation import Candidate_Represenation
+import torch.nn.functional as F
 
 MAX_SEQUENCE_LENGTH = 100
 K = 2 # Number of extracted candidates per passage
@@ -51,7 +52,8 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
                        batch_size=batch_size)  # is embedding dim correct? d_w, #fg: yes
     sp_bilstm = nn.LSTM(input_size=501, hidden_size=100, bidirectional=True) #todo: padding function?
 
-
+    # Weights (... that did not fit anywhere else)
+    wz = nn.Linear(100, 1, bias=False) # transpose of (1, 100)
 
     for epoch in range(num_epochs):
 
@@ -96,8 +98,14 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
             S_Cs = C_rep.S_Cs
             r_Cs = C_rep.r_Cs
             r_Ctilde = C_rep.tilda_r_Cs
-            print(S_Cs.shape, r_Cs.shape, r_Ctilde.shape)
-            input()
+
+            # Answer Scoring
+            # answer size (#candidates, #max_seq_len, #output_dim)
+            # todo: REMOVE PLACEHOLDER!!!
+            z_C = max_pooling(torch.randn(200,100,200), MAX_SEQUENCE_LENGTH)
+            s = wz(z_C)
+            p_C = F.softmax(s, dim=0) # sum over the first dimension
+            print("p_C shape", p_C)
 
             # endregion
 
