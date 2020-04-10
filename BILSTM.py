@@ -47,3 +47,18 @@ def attention(question, context):
     H_P = h_tP # for now
     return H_P
 
+def attention2(candidate, context):
+    # assuming that input for question and context has dim 54x300 respectively and not 54x1x300
+    print('candidate and context shape:',candidate.shape,context.shape)
+    numerator = torch.exp(torch.bmm(torch.transpose(candidate,0,1),torch.transpose(context,1,2)))
+    denominator = torch.sum(numerator) #index 0?
+    alpha_tk = torch.div(numerator,denominator) #->dim 54,54
+    print('alpha',alpha_tk.shape)
+
+    h_tP = torch.bmm(torch.transpose(alpha_tk,1,2),torch.transpose(candidate,0,1)) #->dim 1,300
+    print('htp', h_tP.shape)
+
+    #H_P = torch.cat(, dim=0) #dim -> 54,300
+    #is h_tP already H_P?
+    H_P = h_tP # for now
+    return H_P
