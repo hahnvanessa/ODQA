@@ -53,7 +53,7 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
     sp_bilstm = nn.LSTM(input_size=501, hidden_size=100, bidirectional=True) #todo: padding function?
 
     # Weights (... that did not fit anywhere else)
-    wz = nn.Linear(100, 1, bias=False) # transpose of (1, 100)
+    wz = nn.Linear(200, 100, bias=False) # transpose of (100, 200)
 
     for epoch in range(num_epochs):
 
@@ -88,26 +88,35 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
             packed_R_p = pack(R_p, c_len, batch_first=True, enforce_sorted=False)
             S_p, _ = sp_bilstm.forward(packed_R_p)
             S_p, _ = unpack(S_p, total_length=MAX_SEQUENCE_LENGTH)  #(100,100,200)
-            print('shapes', S_p.shape, C_spans.shape)
 
             # Candidate Represention
             # todo: Do we need to share the weights among the multiple Candidate Rep classes? (Same goes for candidate scores?)
             # In that case we would need to make the Candidate Rep functions take inputs e.g.
             # generate_fused_representation(V). Right now the functions take these values directly from the class.
-            C_rep = Candidate_Represenation(S_p, C_spans, k=K)
+            C_rep = Candidate_Represenation(S_p=S_p, spans=C_spans, passages=contexts, k=K)
             S_Cs = C_rep.S_Cs
             r_Cs = C_rep.r_Cs
             r_Ctilde = C_rep.tilda_r_Cs
+            encoded_candidates = C_rep.encoded_candidates
 
             # Answer Scoring
             # answer size (#candidates, #max_seq_len, #output_dim)
             # todo: REMOVE PLACEHOLDER!!!
             z_C = max_pooling(torch.randn(200,100,200), MAX_SEQUENCE_LENGTH)
-            s = wz(z_C)
+            s = []
+            for c in z_C:
+                s.append(wz(c)) # wz:(200,100)
+            s = torch.stack(s, dim=0)
+            print(s.shape, 's shape')
+            input()
             p_C = F.softmax(s, dim=0) # sum over the first dimension
-            print("p_C shape", p_C)
+            # endregion
+
+            # region Part 3 - Loss
 
             # endregion
+
+
 
 def main(embedding_matrix, encoded_corpora):
     '''
