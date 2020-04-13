@@ -81,7 +81,6 @@ class Candidate_Represenation():
             c = self.wc(r_C) # 1x100
             o = self.wo(rcm) #transpose because first dimensions is 199 instead of 200: 199x100
             V_jm = self.wv(torch.add(c, o).tanh()) # 199x1
-            print(V_jm.shape)
             V_jms.append(V_jm)
 
         V = torch.stack(V_jms, dim=0) #(200x199x1) # should we reshape this to M*M? #V = V.view((self.M,self.M))
