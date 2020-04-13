@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+import torch.nn.functional as F
 
 class Candidate_Scorer():
 	def __init__(self, G_p):
@@ -20,9 +21,10 @@ class Candidate_Scorer():
 		'''
 		b_P = self.begin_scores() #target vector 1x100
 		e_P = self.end_scores() #target vector 1x100
-		numerator = torch.exp(b_P + e_P.transpose(0,1))
-		denominator = torch.sum(numerator) 
-		x = torch.div(numerator, denominator)
+		#numerator = torch.exp(b_P + e_P.transpose(0,1))
+		#denominator = torch.sum(numerator)
+		#x = torch.div(numerator, denominator)
+		x = F.softmax(b_P + e_P, dim=0)
 		norm = x.norm(p=2, dim=1, keepdim=True)
 		x_normalized = x.div(norm)
 		#get top k candidate indices
