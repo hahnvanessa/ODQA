@@ -21,14 +21,9 @@ class Candidate_Scorer():
 		'''
 		b_P = self.begin_scores() #target vector 1x100
 		e_P = self.end_scores() #target vector 1x100
-		#numerator = torch.exp(b_P + e_P.transpose(0,1))
-		#denominator = torch.sum(numerator)
-		#x = torch.div(numerator, denominator)
-		x = F.softmax(b_P + e_P, dim=0)
-		norm = x.norm(p=2, dim=1, keepdim=True)
-		x_normalized = x.div(norm)
+		candidate_prob = F.softmax(b_P + e_P, dim=0)
 		#get top k candidate indices
-		upper_diagonal = torch.triu(x_normalized) #set scores in lower triangular matrix to zero
+		upper_diagonal = torch.triu(candidate_prob) #set scores in lower triangular matrix to zero
 		H, W = upper_diagonal.shape
 		flattened = upper_diagonal.view(-1) #flatten to get top k scores of entire tensor
 		k_max_values, flattened_indices = flattened.topk(k)
