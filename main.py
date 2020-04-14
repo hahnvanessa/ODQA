@@ -1,5 +1,5 @@
 from argparse import ArgumentParser
-from BILSTM import BiLSTM, attention, max_pooling, attention2
+from BILSTM import BiLSTM, attention, max_pooling
 import os
 import pickle
 from torch import nn
@@ -16,8 +16,16 @@ from candidate_representation import Candidate_Representation
 MAX_SEQUENCE_LENGTH = 100
 K = 2 # Number of extracted candidates per passage
 
-def get_distance(candidate, passage):
-    return torch.dist(candidate,passage)
+def get_distance(passages, candidates):
+    passage_distances = []
+    length = candidates.shape[0]
+    for i in range(length):
+        position_distances = []
+        for p in range(passages.shape[1]):
+            position_distances.append(torch.dist(passages[i,p,:], candidates[i,:,:]))
+        position_distances = torch.stack(position_distances, dim=0)
+        passage_distances.append(position_distances.view(1,passages.shape[1]))
+    return torch.squeeze(torch.stack(passage_distances, dim=0))
 
 def get_file_paths(data_dir):
     # Get paths for all files in the given directory
@@ -53,7 +61,7 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
     sq_bilstm = BiLSTM(embedding_matrix, embedding_dim=300, hidden_dim=100,
                        batch_size=batch_size)  # is embedding dim correct? d_w, #fg: yes
     sp_bilstm = nn.LSTM(input_size=501, hidden_size=100, bidirectional=True) #todo: padding function?
-    fp_bilstm = nn.LSTM(input_size=100,hidden_size=100,bidirectional=True)
+    fp_bilstm = nn.LSTM(input_size=403,hidden_size=100,bidirectional=True)
 
 
     for epoch in range(num_epochs):
@@ -101,14 +109,22 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
             r_Ctilde = C_rep.tilda_r_Cs #[200, 100]
 
             #Passage Advanced Representation
-            S_p_attention = attention2(S_Cs,S_p) #[100, 100, 200]
-            U_p = torch.cat((S_p, S_p_attention), 2)   #[100, 100, 400]   
-            c_dist = get_distance(S_Cs,S_p)
-            print(c_dist.shape)
-            U_p = torch.cat((U_p, c_dist), 2)
-            U_p = torch.cat((U_p, r_Cs), 2) #will this work if r_Cs only has 2 dims?
-            U_p = torch.cat((U_p, r_Ctilde), 2) ##will this work if r_Ctilde only has 2 dims?
-            F_p, _ = fp_bilstm.forward(U_p) #TODO: (un)packing?
+            S_P = torch.stack([S_p,S_p],dim=1).view(200,100,200) #reshape S_p
+            S_P_attention = attention(S_Cs, S_P) #[200,100,200] 
+            U_p = torch.cat((S_P, S_P_attention), 2) #[200, 100, 400]
+            S_ps_distance =  get_distance(S_P,S_Cs)
+            print('distance', S_ps_distance.shape)
+            U_p = torch.cat((U_p, S_ps_distance.view((200,100,1))), 2)
+            print('UP', U_p.shape)
+            U_p = torch.cat((U_p, r_Cs.view((200,100,1))), 2) 
+            print('UP', U_p.shape)
+            U_p = torch.cat((U_p, r_Ctilde.view((200,100,1))), 2) 
+            print('UP', U_p.shape)
+            packed_U_p = pack(U_p, c_len, batch_first=True, enforce_sorted=False)
+            F_p, _ = fp_bilstm.forward(U_p)
+            print('FP', F_p.shape)
+            F_p, _ = unpack(F_p, total_length=MAX_SEQUENCE_LENGTH)
+            print('FP', F_p.shape)
 
             # endregion
 
