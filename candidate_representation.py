@@ -3,7 +3,7 @@ from torch import nn
 import torch.nn.functional as F
 
 
-class Candidate_Represenation():
+class Candidate_Representation():
     '''
     Condense and interconnect candidates from different
     passages in order to improve the selection of an answer among them.
@@ -60,8 +60,8 @@ class Candidate_Represenation():
                 S_C = F.pad(input=c, pad=(0, 0, num_start_pads, num_end_pads), mode='constant', value=0)
                 S_Cs.append(S_C)
                 # Condensed Vector Representation
-                # todo: if this is too slow we can take it out out of the for loop again
-                r_C = torch.add(self.wb(sp_cb), self.we(sp_ce)).tanh()
+                # todo: if this is too slow we can take out out of the for loop again
+                r_C = torch.add(self.wb(sp_cb), self.we(sp_ce)).tanh() # 1x100
                 r_Cs.append(r_C)
                 # Candidate in encoded form (embedding indices)
                 enc_c = self.passages[p][start_indices[p][i]:end_indices[p][i]+1]
@@ -70,11 +70,9 @@ class Candidate_Represenation():
 
         # Stack to turn into tensor
         S_Cs = torch.stack(S_Cs, dim=0)
-        r_Cs = torch.stack(r_Cs, dim=0)
+        r_Cs = torch.stack(r_Cs, dim=0) # if we stack, the dimensions are 200x1x100, should we concatenate? then we have 200x100
         encoded_candidates = torch.stack(encoded_candidates, dim=0)
         return S_Cs, r_Cs, encoded_candidates
-
- 
 
     def calculate_correlations(self):
         '''
@@ -87,7 +85,7 @@ class Candidate_Represenation():
 
         for i, r_C in enumerate(self.r_Cs):
             rcm = torch.cat([self.r_Cs[0:i], self.r_Cs[i+1:]], dim=0)
-            c = self.wc(r_C)
+            c = self.wc(r_C) # 1x100
             o = self.wo(rcm) #transpose because first dimensions is 199 instead of 200
             V_jm = self.wv(torch.add(c, o).tanh())
             V_jms.append(V_jm)
@@ -104,28 +102,17 @@ class Candidate_Represenation():
         alpha_ms = []
         for i, V_jm in enumerate(self.V):
             numerator = torch.exp(V_jm)
-            denominator_correlations = torch.cat([self.V[0:i], self.V[i:]], dim=0)
-            print('denominator correlations shape', denominator_correlations.shape)
-            # todo: this throws an error if i is 0
-            #denominator_correlations = torch.stack([self.V[0:i], self.V[i:]], dim=0)
+            denominator_correlations = torch.cat([self.V[0:i], self.V[i+1:]], dim=0) # (200x199)
+
             denominator = torch.sum(torch.exp(denominator_correlations), dim=0)
-            alpha_m = torch.div(numerator, denominator)
+            alpha_m = torch.div(numerator, denominator) # 199x1
             alpha_ms.append(alpha_m)
-            assert alpha_m.shape[0] == 199
-            print('alpha_m shape', alpha_m.shape)
-
         alpha = torch.stack(alpha_ms, dim=0) #(200,199)
-
         tilda_rсms = []
-
         for i, r_C in enumerate(self.r_Cs):
-            # todo: I changed this please double check. I think the sum is taken for every individual candidate so it is taken M times
-            rcm = torch.cat([self.r_Cs[0:i], self.r_Cs[i+1:]], dim=0) #maybe alpha is multiplied
-            alpha_m = torch.cat([alpha[0:i], alpha[i+1:]], dim=0)
-            tilda_rсm = torch.sum(torch.mm(alpha_m, rcm), dim=1) # todo: changed from bmm to mm
+            rcm = torch.cat([self.r_Cs[0:i], self.r_Cs[i+1:]], dim=0) #maybe alpha is multiplied (199x100)
+            alpha_m = torch.cat([alpha[0:i], alpha[i+1:]], dim=0) # (199x199)
+            tilda_rсm = torch.sum(torch.mm(alpha_m, rcm), dim=0) # (1x100)
             tilda_rсms.append(tilda_rсm)
 
-        #tilda_rcms = torch.stack(tilda_rcms, dim=0)
-        #tilda_rC = torch.sum(tilda_rcms) # sum for every candidate so we should have M values
-        #return tilda_rC
-        return torch.stack(tilda_rсms, dim=0)
+        return torch.stack(tilda_rсms, dim=0) # (200x1x100)
