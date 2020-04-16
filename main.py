@@ -11,10 +11,21 @@ import question_answer_set as qas
 import candidate_scoring
 from torch.nn.utils.rnn import pack_padded_sequence as pack
 from torch.nn.utils.rnn import pad_packed_sequence as unpack
-from candidate_representation import Candidate_Represenation
+from candidate_representation import Candidate_Representation
 
 MAX_SEQUENCE_LENGTH = 100
 K = 2 # Number of extracted candidates per passage
+
+def get_distance(passages, candidates):
+    passage_distances = []
+    length = candidates.shape[0]
+    for i in range(length):
+        position_distances = []
+        for p in range(passages.shape[1]):
+            position_distances.append(torch.dist(passages[i,p,:], candidates[i,:,:]))
+        position_distances = torch.stack(position_distances, dim=0)
+        passage_distances.append(position_distances.view(1,passages.shape[1]))
+    return torch.squeeze(torch.stack(passage_distances, dim=0))
 
 def get_file_paths(data_dir):
     # Get paths for all files in the given directory
@@ -50,7 +61,7 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
     sq_bilstm = BiLSTM(embedding_matrix, embedding_dim=300, hidden_dim=100,
                        batch_size=batch_size)  # is embedding dim correct? d_w, #fg: yes
     sp_bilstm = nn.LSTM(input_size=501, hidden_size=100, bidirectional=True) #todo: padding function?
-
+    fp_bilstm = nn.LSTM(input_size=403,hidden_size=100,bidirectional=True)
 
 
     for epoch in range(num_epochs):
@@ -60,17 +71,17 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
             print('Started candidate extraction...')
             # region Part 1 - Candidate Extraction
             # Question and Passage Representation
-            q_representation = qp_bilstm.forward(questions, sentence_lengths=q_len)
-            c_representation = qp_bilstm.forward(contexts, sentence_lengths=c_len)
+            q_representation = qp_bilstm.forward(questions, sentence_lengths=q_len) #[100, 100, 200]
+            c_representation = qp_bilstm.forward(contexts, sentence_lengths=c_len) #[100, 100, 200]
             # Question and Passage Interaction
-            HP_attention = attention(q_representation, c_representation)
+            HP_attention = attention(q_representation, c_representation) #[100, 100, 200]
             G_input = torch.cat((c_representation, HP_attention), 2)
             G_ps, _ = G_bilstm.forward(G_input)
             C_spans = []  # (100x2x2)
             for G_p in G_ps:
                 # Store the spans of the top k candidates in the passage
                 C_spans.append(candidate_scoring.Candidate_Scorer(G_p).candidate_probabilities(K))  # candidate scores for current context
-            C_spans = torch.stack(C_spans, dim=0)
+            C_spans = torch.stack(C_spans, dim=0) #[100, 2, 2]
             # if we create only one candidate scorer instance before (e.g. one for each question or one for all questions), we need to change the G_p argument
             # endregion
 
@@ -86,18 +97,34 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
             packed_R_p = pack(R_p, c_len, batch_first=True, enforce_sorted=False)
             S_p, _ = sp_bilstm.forward(packed_R_p)
             S_p, _ = unpack(S_p, total_length=MAX_SEQUENCE_LENGTH)  #(100,100,200)
-            print('shapes', S_p.shape, C_spans.shape)
+            #print('shapes', S_p.shape, C_spans.shape)
 
-            # Candidate Represention
+            # Candidate Representation
             # todo: Do we need to share the weights among the multiple Candidate Rep classes? (Same goes for candidate scores?)
             # In that case we would need to make the Candidate Rep functions take inputs e.g.
             # generate_fused_representation(V). Right now the functions take these values directly from the class.
-            C_rep = Candidate_Represenation(S_p, C_spans, k=K)
-            S_Cs = C_rep.S_Cs
-            r_Cs = C_rep.r_Cs
-            r_Ctilde = C_rep.tilda_r_Cs
-            print(S_Cs.shape, r_Cs.shape, r_Ctilde.shape)
-            input()
+            C_rep = Candidate_Representation(S_p, C_spans, k=K)
+            S_Cs = C_rep.S_Cs #[200, 100, 200]
+            r_Cs = C_rep.r_Cs #[200, 100]
+            r_Ctilde = C_rep.tilda_r_Cs #[200, 100]
+
+            #Passage Advanced Representation
+            S_P = torch.stack([S_p,S_p],dim=1).view(200,100,200) #reshape S_p
+            S_P_attention = attention(S_Cs, S_P) #[200,100,200] 
+            U_p = torch.cat((S_P, S_P_attention), 2) #[200, 100, 400]
+            S_ps_distance =  get_distance(S_P,S_Cs)
+            print('distance', S_ps_distance.shape)
+            U_p = torch.cat((U_p, S_ps_distance.view((200,100,1))), 2)
+            print('UP', U_p.shape)
+            U_p = torch.cat((U_p, r_Cs.view((200,100,1))), 2) 
+            print('UP', U_p.shape)
+            U_p = torch.cat((U_p, r_Ctilde.view((200,100,1))), 2) 
+            print('UP', U_p.shape)
+            packed_U_p = pack(U_p, c_len, batch_first=True, enforce_sorted=False)
+            F_p, _ = fp_bilstm.forward(U_p)
+            print('FP', F_p.shape)
+            F_p, _ = unpack(F_p, total_length=MAX_SEQUENCE_LENGTH)
+            print('FP', F_p.shape)
 
             # endregion
 
