@@ -121,8 +121,7 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
             U_p = torch.cat((U_p, r_Ctilde.view((200,100,1))), 2) 
             print('UP', U_p.shape)
             packed_U_p = pack(U_p, c_len, batch_first=True, enforce_sorted=False)
-            F_p, _ = fp_bilstm.forward(U_p)
-            print('FP', F_p.shape)
+            F_p, _ = fp_bilstm.forward(packed_U_p)
             F_p, _ = unpack(F_p, total_length=MAX_SEQUENCE_LENGTH)
             print('FP', F_p.shape)
 
