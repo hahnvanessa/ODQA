@@ -11,7 +11,7 @@ import question_answer_set as qas
 import candidate_scoring
 from torch.nn.utils.rnn import pack_padded_sequence as pack
 from torch.nn.utils.rnn import pad_packed_sequence as unpack
-from candidate_representation import Candidate_Represenation
+from candidate_representation import Candidate_Representation
 import torch.nn.functional as F
 
 MAX_SEQUENCE_LENGTH = 100
@@ -106,13 +106,17 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
             # todo: Do we need to share the weights among the multiple Candidate Rep classes? (Same goes for candidate scores?)
             # In that case we would need to make the Candidate Rep functions take inputs e.g.
             # generate_fused_representation(V). Right now the functions take these values directly from the class.
-            C_rep = Candidate_Represenation(S_p=S_p, spans=C_spans, passages=contexts, k=K)
+            C_rep = Candidate_Representation(S_p=S_p, spans=C_spans, passages=contexts, k=K)
             S_Cs = C_rep.S_Cs #[200, 100, 200]
             r_Cs = C_rep.r_Cs #[200, 100]
             r_Ctilde = C_rep.tilda_r_Cs #[200, 100]
             encoded_candidates = C_rep.encoded_candidates
             
             # Passage Advanced Representation
+            S_P = torch.stack([S_p,S_p],dim=1).view(200,100,200) #reshape S_p
+            S_P_attention = attention(S_Cs, S_P) #[200,100,200]
+            U_p = torch.cat((S_P, S_P_attention), 2) #[200, 100, 400]
+            S_ps_distance =  get_distance(S_P,S_Cs)
             U_p = torch.cat((U_p, S_ps_distance.view((200,100,1))), 2)
             print('UP', U_p.shape)
             U_p = torch.cat((U_p, r_Cs.view((200,100,1))), 2) 
