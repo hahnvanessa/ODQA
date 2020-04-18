@@ -17,6 +17,28 @@ import torch.nn.functional as F
 MAX_SEQUENCE_LENGTH = 100
 K = 2 # Number of extracted candidates per passage
 
+# todo: fix the paths here
+with open('outputs_numpy_encoding_v2//idx_2_word_dict.pkl', 'rb') as f:
+    idx_2_word_dic = pickle.load(f)
+
+def candidate_to_string(candidate, idx_2_word_dic=idx_2_word_dic):
+    '''
+    Turns a tensor of indices into a string.
+    :param candidate:
+    :param idx_2_word_dic:
+    :return:
+    '''
+    '''
+    Example:
+    values, indices = torch.max(p_C, 0) #0 indicates the dimension along which you want to find the max
+    # todo: assert that only one value is returned
+    print(values, indices)
+    print(candidate_to_string(encoded_candidates[indices]))
+    '''
+    return [idx_2_word_dic[i] for i in candidate.tolist()[0][0] if i != 0]
+   
+
+
 def get_distance(passages, candidates):
     passage_distances = []
     length = candidates.shape[0]
