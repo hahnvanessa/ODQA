@@ -27,7 +27,7 @@ class ODQA(nn.Module):
         self.fp_bilstm = nn.LSTM(input_size=403,hidden_size=100,bidirectional=True)
         
         # Linear Transformations
-        self.wz = nn.Linear(200, 100, bias=False) # transpose of (100, 200)
+        wz = nn.Linear(200, 1, bias=False) # transpose of (1, 200)
 
 
     def extract_candidates(self, questions, contexts):
