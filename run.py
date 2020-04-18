@@ -70,7 +70,7 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
     :return:
     '''
     # Load Dataset with the dataloader
-    train_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False)
 
     # Store representations
     qp_representations = {}
