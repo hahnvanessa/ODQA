@@ -48,6 +48,18 @@ class ODQA(nn.Module):
         C_spans = torch.stack(C_spans, dim=0) #[100, 2, 2]
 
         return C_spans
+    
+    
+    def get_distance(self, passages, candidates):
+        passage_distances = []
+        length = candidates.shape[0]
+        for i in range(length):
+            position_distances = []
+            for p in range(passages.shape[1]):
+                position_distances.append(torch.dist(passages[i,p,:], candidates[i,:,:]))
+            position_distances = torch.stack(position_distances, dim=0)
+            passage_distances.append(position_distances.view(1,passages.shape[1]))
+        return torch.squeeze(torch.stack(passage_distances, dim=0))
 
 
     def select_answers(self, questions, contexts)
@@ -83,7 +95,7 @@ class ODQA(nn.Module):
         S_P = torch.stack([S_p,S_p],dim=1).view(200,100,200) #reshape S_p
         S_P_attention = attention(S_Cs, S_P) #[200,100,200]
         U_p = torch.cat((S_P, S_P_attention), 2) #[200, 100, 400]
-        S_ps_distance =  get_distance(S_P,S_Cs)
+        S_ps_distance =  self.get_distance(S_P,S_Cs)
         U_p = torch.cat((U_p, S_ps_distance.view((200,100,1))), 2)
         print('UP', U_p.shape)
         U_p = torch.cat((U_p, r_Cs.view((200,100,1))), 2) 
