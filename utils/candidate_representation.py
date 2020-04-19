@@ -9,13 +9,10 @@ class Candidate_Representation():
     passages in order to improve the selection of an answer among them.
     '''
 
-    def __init__(self, S_p, spans, passages, k=2):
+    # todo: change this so that weights are given as parameters
+    def __init__(self, k=2):
         print('Started Candidate Representation.')
-        self.S_p = S_p
-        self.spans = spans
-        self.passages = passages
         self.k = k
-        self.M = spans.shape[0]*k #num_passages * num_candidates
         self.wb = nn.Linear(200, 100, bias=False) # not (100,200) because nn.linear transposes automatically
         self.we = nn.Linear(200, 100, bias=False)  # not (100,200) because nn.linear transposes automatically
         # Linear transformations to capture the intensity
@@ -23,9 +20,24 @@ class Candidate_Representation():
         self.wc = nn.Linear(100, 100, bias=False)
         self.wo = nn.Linear(100, 100, bias=False)
         self.wv = nn.Linear(100, 1, bias=False)
+
+
+    def calculate_candidate_representations(self, S_p, spans, passages):
+        '''
+        Given the candidate spans and the passages, extracts the candidates,
+        calculates the condensed vector representation r_c, forms a
+        correlation matrix between the candidates and calculates
+        a fused representation tilda_r_Cs to represent how each candidate is
+        affected by each other candidate.
+        '''
+        self.S_p = S_p
+        self.spans = spans
+        self.passages = passages
+        self.M = spans.shape[0] * self.k  # num_passages * num_candidates
         self.S_Cs, self.r_Cs, self.encoded_candidates = self.calculate_condensed_vector_representation()
         self.V = self.calculate_correlations()
         self.tilda_r_Cs = self.generate_fused_representation()
+
 
 
     def calculate_condensed_vector_representation(self):
