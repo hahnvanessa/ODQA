@@ -3,24 +3,23 @@ from torch import nn
 import torch.nn.functional as F
 
 class Candidate_Scorer():
-	def __init__(self, G_p):
+	def __init__(self):
 		self.wb = nn.Linear(200, 1, bias=False) #1 is the output shape because we want one score as output
 		self.we = nn.Linear(200, 1, bias=False)
-		self.G_p = G_p
 
-	def begin_scores(self):
-		return self.wb(self.G_p)
+	def begin_scores(self, G_p):
+		return self.wb(G_p)
 
-	def end_scores(self):
-		return self.we(self.G_p)
+	def end_scores(self, G_p):
+		return self.we(G_p)
 
-	def candidate_probabilities(self, k):
+	def candidate_probabilities(self, G_p, k):
 		'''
 		Returns the start and end indices of the top k candidates within a single
 		context.
 		'''
-		b_P = self.begin_scores() #target vector 1x100
-		e_P = self.end_scores() #target vector 1x100
+		b_P = self.begin_scores(G_p) #target vector 1x100
+		e_P = self.end_scores(G_p) #target vector 1x100
 		numerator = torch.exp(b_P + e_P.transpose(0,1))
 		denominator = torch.sum(numerator)
 		candidate_probs = torch.div(numerator, denominator)
