@@ -17,6 +17,28 @@ import torch.nn.functional as F
 MAX_SEQUENCE_LENGTH = 100
 K = 2 # Number of extracted candidates per passage
 
+# todo: fix the paths here
+with open('outputs_numpy_encoding_v2//idx_2_word_dict.pkl', 'rb') as f:
+    idx_2_word_dic = pickle.load(f)
+
+def candidate_to_string(candidate, idx_2_word_dic=idx_2_word_dic):
+    '''
+    Turns a tensor of indices into a string.
+    :param candidate:
+    :param idx_2_word_dic:
+    :return:
+    '''
+    '''
+    Example:
+    values, indices = torch.max(p_C, 0) #0 indicates the dimension along which you want to find the max
+    # todo: assert that only one value is returned
+    print(values, indices)
+    print(candidate_to_string(encoded_candidates[indices]))
+    '''
+    return [idx_2_word_dic[i] for i in candidate.tolist()[0][0] if i != 0]
+   
+
+
 def get_distance(passages, candidates):
     passage_distances = []
     length = candidates.shape[0]
@@ -48,7 +70,7 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
     :return:
     '''
     # Load Dataset with the dataloader
-    train_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False)
 
     # Store representations
     qp_representations = {}
@@ -72,6 +94,13 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
 
         for batch_number, data in enumerate(train_loader):
             questions, contexts, answers, q_len, c_len, a_len, q_id, common_word_encodings = data
+            #filter out the ground-truth passages for pre-training
+            pretrain_contexts = contexts[gt_contexts.nonzero(),:]
+            pretrain_questions = questions[:pretrain_contexts.shape[0],:]
+            pretrain_answers = answers[:pretrain_contexts.shape[0],:]
+            #then use the pretrain versions for pre-training below
+
+
             print('Started candidate extraction...')
             # region Part 1 - Candidate Extraction
             # Question and Passage Representation

@@ -20,6 +20,7 @@ class Question_Answer_Set(Dataset):
         self.common_word_encoding_list = []
         self.questions = {}
         self.answers = {}
+        self.gt_contexts = []
 
         # Read in Dataset
         self.read_in_dataset(file_content)
@@ -44,6 +45,8 @@ class Question_Answer_Set(Dataset):
                 self.questionid_context_answerid.append((idx, torch.from_numpy(context).type(torch.LongTensor), idx))
                 # Encode common_words and append to storage
                 self.common_word_encoding_list.append(self.common_word_encoding(question, context))
+                # Check if context contains ground truth answer
+                self.gt_contexts.append(1) if np.all(np.in1d(answer[np.nonzero(answer)], context)) else self.gt_contexts.append(0)
             self.questions[idx] = torch.from_numpy(question).type(torch.LongTensor)
             self.answers[idx] = torch.from_numpy(answer).type(torch.LongTensor)
         self.set_len = len(self.questionid_context_answerid)
@@ -58,6 +61,7 @@ class Question_Answer_Set(Dataset):
         return self.questions[self.questionid_context_answerid[index][0]], self.questionid_context_answerid[index][0]
 
     def get_answer(self, index):
+        print(self.answers[self.questionid_context_answerid[index][2]])
         return self.answers[self.questionid_context_answerid[index][2]]
 
     def get_context(self, index):
@@ -93,7 +97,8 @@ class Question_Answer_Set(Dataset):
         context = self.get_context(index)
         answer = self.get_answer(index)
         common_word_encoding = self.common_word_encoding_list[index]
-        return question, context, answer, self.determine_length(question), self.determine_length(context), self.determine_length(answer), q_id, common_word_encoding
+        gt_contexts = self.gt_contexts[index]
+        return question, context, gt_contexts, answer, self.determine_length(question), self.determine_length(context), self.determine_length(answer), q_id, common_word_encoding
 
 
     def set_max_len(self, max_len):
