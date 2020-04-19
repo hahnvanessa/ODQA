@@ -94,6 +94,13 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
 
         for batch_number, data in enumerate(train_loader):
             questions, contexts, answers, q_len, c_len, a_len, q_id, common_word_encodings = data
+            #filter out the ground-truth passages for pre-training
+            pretrain_contexts = contexts[gt_contexts.nonzero(),:]
+            pretrain_questions = questions[:pretrain_contexts.shape[0],:]
+            pretrain_answers = answers[:pretrain_contexts.shape[0],:]
+            #then use the pretrain versions for pre-training below
+
+
             print('Started candidate extraction...')
             # region Part 1 - Candidate Extraction
             # Question and Passage Representation
