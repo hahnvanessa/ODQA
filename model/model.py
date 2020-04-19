@@ -12,28 +12,25 @@ from utils.candidate_representation import Candidate_Representation
 
 class ODQA(nn.Module):
 
-    def __init__ (self, args):
+    def __init__ (self, k, max_sequence_length, batch_size):
         super(ODQA, self).__init__()
-        self.args = args
-
         # Constants
         # todo: make this adjustable through args
-        self.K = #from args2
-        self.MAX_SEQUENCE_LENGTH = #100
-        self.batch_size = #
+        self.K = k
+        self.MAX_SEQUENCE_LENGTH = max_sequence_length
+        self.BATCH_SIZE = batch_size
 
         # Initialize BiLSTMs
         self.qp_bilstm = BiLSTM(embedding_matrix, embedding_dim=300, hidden_dim=100,
-                    batch_size=batch_size)
+                    BATCH_SIZE=BATCH_SIZE)
         self.G_bilstm = nn.LSTM(input_size=400, hidden_size=100, bidirectional=True)
         self.sq_bilstm = BiLSTM(embedding_matrix, embedding_dim=300, hidden_dim=100,
-                           batch_size=batch_size)  # is embedding dim correct? d_w, #fg: yes
+                           BATCH_SIZE=BATCH_SIZE)  # is embedding dim correct? d_w, #fg: yes
         self.sp_bilstm = nn.LSTM(input_size=501, hidden_size=100, bidirectional=True) #todo: padding function?
-
         self.fp_bilstm = nn.LSTM(input_size=403,hidden_size=100,bidirectional=True)
 
 
-        # Candidate Scorer
+        # Initialize Candidate Objects
         self.candidate_scorer = Candidate_Scorer()
         # Candidate Representation
         self.candidate_representation = Candidate_Representation(k=self.K)
@@ -43,7 +40,7 @@ class ODQA(nn.Module):
     def extract_candidates(self, questions, contexts):
         '''
         Extracts the k candidates with the highest probability from each passage and returns their spans within
-        their respective passage.
+        their respective passages.
         '''
         # Question and Passage Representation
         q_representation = self.qp_bilstm.forward(questions, sentence_lengths=q_len) #[100, 100, 200]
@@ -72,16 +69,16 @@ class ODQA(nn.Module):
         return torch.squeeze(torch.stack(passage_distances, dim=0))
 
 
-    def represent_passage(self, questions, contexts, common_word_encodings, c_len):
+    def compute_passage_representation(self, questions, contexts, common_word_encodings, c_len):
         '''
-        Creates an passage representation that is dependent on the question that passage is linked to.
+        Computes a passage representation that is dependent on the question that passage is linked to.
         '''
         S_q = self.sq_bilstm.forward(questions, sentence_lengths=q_len)
         r_q = max_pooling(S_q, self.MAX_SEQUENCE_LENGTH) #(100, 1, 200)
         # Passage Representation
         w_emb = self.qp_bilstm.embed(contexts) # word embeddings (100,100,300)
         R_p = torch.cat((w_emb, common_word_encodings), 2)
-        R_p = torch.cat((R_p, r_q.expand(self.batch_size, self.MAX_SEQUENCE_LENGTH, 200)), 2) #(100,100,501)
+        R_p = torch.cat((R_p, r_q.expand(self.BATCH_SIZE, self.MAX_SEQUENCE_LENGTH, 200)), 2) #(100,100,501)
         packed_R_p = pack(R_p, c_len, batch_first=True, enforce_sorted=False)
         S_p, _ = self.sp_bilstm.forward(packed_R_p)
         S_p, _ = unpack(S_p, total_length=self.MAX_SEQUENCE_LENGTH)  #(100,100,200)
@@ -89,8 +86,7 @@ class ODQA(nn.Module):
 
 
 
-    def compute_passage_advances_repr(self, S_p, S_Cs, r_Cs, r_Ctilde):
-
+    def compute_passage_advanced_representation(self, c_len, S_p, S_Cs, r_Cs, r_Ctilde):
         S_P = torch.stack([S_p,S_p],dim=1).view(200,100,200) #reshape S_p
         S_P_attention = attention(S_Cs, S_P) #[200,100,200]
         U_p = torch.cat((S_P, S_P_attention), 2) #[200, 100, 400]
@@ -102,7 +98,7 @@ class ODQA(nn.Module):
         U_p = torch.cat((U_p, r_Ctilde.view((200,100,1))), 2) 
         print('UP', U_p.shape)
         packed_U_p = pack(U_p, c_len, batch_first=True, enforce_sorted=False)
-        F_p, _ = fp_bilstm.forward(packed_U_p)
+        F_p, _ = self.fp_bilstm.forward(packed_U_p)
         F_p, _ = unpack(F_p, total_length=MAX_SEQUENCE_LENGTH)
         print('FP', F_p.shape)
 
@@ -110,13 +106,12 @@ class ODQA(nn.Module):
 
 
     def score_answers(self, F_p):
-
-        z_C = max_pooling(F_p, MAX_SEQUENCE_LENGTH)
+        z_C = max_pooling(F_p, self.MAX_SEQUENCE_LENGTH)
         s = []
         for c in z_C:
-            s.append(wz(c)) # wz:(200,100)
+            s.append(self.wz(c)) # wz:(200,100)
         s = torch.stack(s, dim=0)
-        p_C = F.softmax(s, dim=0)
+        p_C = torch.softmax(s, dim=0)
 
         return p_C
 
@@ -124,16 +119,15 @@ class ODQA(nn.Module):
         questions, contexts, answers, q_len, c_len, a_len, q_id, common_word_encodings = batch
         # Extract candidate spans form the passages
         C_spans = self.extract_candidates(questions, contexts)
-        # Select the candidate that most likely represents the answer
-        S_p = self.represent_passage(questions, contexts, common_word_encodings, c_len)
-
+        # Represents the passage as being dependent on the answer
+        S_p = self.compute_passage_representation(questions, contexts, common_word_encodings, c_len)
+        # Represents the candidates
         C_rep = self.candidate_representation.calculate_candidate_representations(S_p=S_p, spans=C_spans, passages=contexts)
-        # C_rep = Candidate_Representation(S_p=S_p, spans=C_spans, passages=contexts, k=self.K)
         S_Cs = C_rep.S_Cs  # [200, 100, 200]
         r_Cs = C_rep.r_Cs  # [200, 100]
         r_Ctilde = C_rep.tilda_r_Cs  # [200, 100]
         encoded_candidates = C_rep.encoded_candidates
-
-        F_p = compute_passage_advances_repr(S_p, S_Cs, r_Cs, r_Ctilde)
-
-        answer_probs = score_answers(F_p)
+        # Compute an advanced representation of the passage
+        F_p = self.compute_passage_advanced_representation(c_len=c_len, S_p=S_p, S_Cs=S_Cs, r_Cs=r_Cs, r_Ctilde= r_Ctilde)
+        # Commpute the probabilities of the candidates (highest should be the ground truth answer)
+        p_C = self.score_answers(F_p)
