@@ -5,7 +5,6 @@ from torch.nn.utils.rnn import pad_packed_sequence as unpack
 
 class BiLSTM(nn.Module):
     def __init__(self, embedding_matrix, embedding_dim, hidden_dim, dropout=0.2):
-        
         super(BiLSTM, self).__init__()
 
         #what about cuda? where do we need to specify GPU?
@@ -13,7 +12,6 @@ class BiLSTM(nn.Module):
         self.embeddings = embedding_matrix
         self.embedding_dim = embedding_dim
         self.hidden_dim = hidden_dim
-        self.batch_size = batch_size
         self.embedding = nn.Embedding.from_pretrained(torch.FloatTensor(self.embeddings))
         self.dropout = dropout #try without dropout too and with different p
         self.bilstm = nn.LSTM(input_size=embedding_dim, hidden_size=hidden_dim, dropout=self.dropout, bidirectional=True)
