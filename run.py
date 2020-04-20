@@ -49,14 +49,16 @@ def get_distance(passages, candidates):
         passage_distances.append(position_distances.view(1,passages.shape[1]))
     return torch.squeeze(torch.stack(passage_distances, dim=0))
 
-def store_model(model, filepath):
-    # todo
-    pass
+def store_parameters(model, filepath):
+    # A common PyTorch convention is to save models using either a .pt or .pth file extension.
+    torch.save(model.state_dict(), filepath)
+    print('Stored parameters')
 
+def load_parameters(model, filepath):
+    model.load_state_dict(torch.load(filepath))
+    print('load parameters')
+    return model
 
-def load_model(filepath):
-    # todo
-    pass
 
 def get_file_paths(data_dir):
     # Get paths for all files in the given directory
@@ -70,7 +72,7 @@ def get_file_paths(data_dir):
 
 
 # todo: batch size must be varied manually depending on whether we use searchqa or quasar
-def batch_training(dataset, embedding_matrix, pretrained_model=None, batch_size=100, num_epochs=10):
+def batch_training(dataset, embedding_matrix, pretrained_parameters_filepath=None, batch_size=100, num_epochs=10):
     '''
     Performs minibatch training. One datapoint is a question-context-answer pair.
     :param dataset:
@@ -87,11 +89,13 @@ def batch_training(dataset, embedding_matrix, pretrained_model=None, batch_size=
     #todo: check if ressources of gpu are really used
 
     # Initialize model
-    if pretrained_model == None:
+    if pretrained_parameters_filepath == None:
         model = ODQA(k=K, max_sequence_length=MAX_SEQUENCE_LENGTH, batch_size=batch_size, embedding_matrix=embedding_matrix).to(device)
+        store_parameters(model, 'test_file_parameters.pth')
     else:
-        model = pretrained_model
-        model.reset_batch_size(batch_size=batch_size)
+        model = ODQA(k=K, max_sequence_length=MAX_SEQUENCE_LENGTH, batch_size=batch_size, embedding_matrix=embedding_matrix).to(device)
+        model = load_parameters(model, filepath=pretrained_parameters_filepath)
+        model.reset_batch_size(batch_size)
 
     # Print model's state_dict
     print("Model's state_dict:")
@@ -104,7 +108,7 @@ def batch_training(dataset, embedding_matrix, pretrained_model=None, batch_size=
             predicted_answer_as_strings = candidate_to_string(predicted_answer)
             ground_truth_answer_as_strings = candidate_to_string(ground_truth_answer)
             question_as_strings = candidate_to_string(question)
-            #print(question_as_strings, predicted_answer_as_strings, ground_truth_answer_as_strings)
+            print(question_as_strings, predicted_answer_as_strings, ground_truth_answer_as_strings)
 
 
 
