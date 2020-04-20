@@ -12,7 +12,7 @@ from utils.candidate_representation import Candidate_Representation
 
 class ODQA(nn.Module):
 
-    def __init__ (self, k, max_sequence_length, batch_size):
+    def __init__ (self, k, max_sequence_length, batch_size, embedding_matrix):
         super(ODQA, self).__init__()
         # Constants
         # todo: make this adjustable through args
@@ -36,6 +36,9 @@ class ODQA(nn.Module):
         self.candidate_representation = Candidate_Representation(k=self.K)
         # Answer Scoring
         self.wz = nn.Linear(200, 1, bias=False) # transpose of (1, 200)
+
+    def reset_batch_size(self, batch_size):
+        self.BATCH_SIZE = batch_size
 
     def extract_candidates(self, questions, contexts):
         '''
@@ -131,3 +134,8 @@ class ODQA(nn.Module):
         F_p = self.compute_passage_advanced_representation(c_len=c_len, S_p=S_p, S_Cs=S_Cs, r_Cs=r_Cs, r_Ctilde= r_Ctilde)
         # Commpute the probabilities of the candidates (highest should be the ground truth answer)
         p_C = self.score_answers(F_p)
+        # Return the embedding-index version of the candidate with the highest probability
+        # todo: check if this works
+        value, index = torch.max(p_C, 0)
+        # todo: Maybe we can use the value to find out how certain the algorithm is about our candidate
+        return encoded_candidates[index]
