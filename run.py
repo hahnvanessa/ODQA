@@ -93,6 +93,10 @@ def batch_training(dataset, embedding_matrix, pretrained_model=None, batch_size=
         model = pretrained_model
         model.reset_batch_size(batch_size=batch_size)
 
+    # Print model's state_dict
+    print("Model's state_dict:")
+    for param_tensor in model.state_dict():
+        print(param_tensor, "\t", model.state_dict()[param_tensor].size())
     for epoch in range(num_epochs):
         for batch_number, data in enumerate(train_loader):
             print(f'epoch number {epoch} batch number {batch_number}.')
@@ -100,7 +104,7 @@ def batch_training(dataset, embedding_matrix, pretrained_model=None, batch_size=
             predicted_answer_as_strings = candidate_to_string(predicted_answer)
             ground_truth_answer_as_strings = candidate_to_string(ground_truth_answer)
             question_as_strings = candidate_to_string(question)
-            print(question_as_strings, predicted_answer_as_strings, ground_truth_answer_as_strings)
+            #print(question_as_strings, predicted_answer_as_strings, ground_truth_answer_as_strings)
 
 
 
