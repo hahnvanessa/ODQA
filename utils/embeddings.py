@@ -30,7 +30,7 @@ OUTPUT_PATH_ENCODED = Path("/".join([dirpath, 'outputs']))
 
 # Parameters
 MAX_SEQUENCE_LENGTH = 100  # should approximately be the mean sentence length+ 0.5std, searchqa has highest seq. length with appr. 54
-VOCAB_SIZE = 20000  # todo: decide on vocab size, not specified by paper, good value might be 20000
+VOCAB_SIZE = 100000  # todo: decide on vocab size, not specified by paper, good value might be 20000
 EMBEDDING_DIM = 300  # 300 dimensions as specified by paper
 PAD_IDENTIFIER = '<PAD>'
 UNKNOWN_IDENTIFIER = '<UNK>'
@@ -242,7 +242,7 @@ def encode_untokenized_file(DATASET_PATH, filename, word_2_idx, type='quasar'):
     enc_corpus_dict = encode_corpus_dict(tok_corpus_dict, word_2_idx)
     # Save to disk
     with open(os.path.join(OUTPUT_PATH_ENCODED, filename), 'wb') as fo:
-        pickle.dump(quasar_enc_corpus_dict, fo)
+        pickle.dump(enc_corpus_dict, fo)
 
     print('wrote file to disk', filename)
 
