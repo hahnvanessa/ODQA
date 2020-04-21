@@ -7,10 +7,12 @@ import torch
 from torch.nn.utils.rnn import pack_padded_sequence
 from torch.utils.data import Dataset, DataLoader
 import utils.question_answer_set as qas
+from utils.loss import Loss_Function
 from torch.nn.utils.rnn import pack_padded_sequence as pack
 from torch.nn.utils.rnn import pad_packed_sequence as unpack
 import torch.nn.functional as F
 from model.model import ODQA
+from torch import nn, optim
 
 MAX_SEQUENCE_LENGTH = 100
 K = 2 # Number of extracted candidates per passage
@@ -49,16 +51,6 @@ def get_distance(passages, candidates):
         passage_distances.append(position_distances.view(1,passages.shape[1]))
     return torch.squeeze(torch.stack(passage_distances, dim=0))
 
-def store_parameters(model, filepath):
-    # A common PyTorch convention is to save models using either a .pt or .pth file extension.
-    torch.save(model.state_dict(), filepath)
-    print('Stored parameters')
-
-def load_parameters(model, filepath):
-    model.load_state_dict(torch.load(filepath))
-    print('load parameters')
-    return model
-
 
 def get_file_paths(data_dir):
     # Get paths for all files in the given directory
@@ -81,26 +73,29 @@ def batch_training(dataset, embedding_matrix, pretrained_parameters_filepath=Non
     :param num_epochs:
     :return:
     '''
-    # Load Dataset with the dataloader
-    train_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False)
-
     # Offer a sacrifice to the Cuda-God so that it may reward us with high accuracy
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    #todo: check if ressources of gpu are really used
+
+    # Load Dataset with the dataloader
+    train_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False)
 
     # Initialize model
     if pretrained_parameters_filepath == None:
         model = ODQA(k=K, max_sequence_length=MAX_SEQUENCE_LENGTH, batch_size=batch_size, embedding_matrix=embedding_matrix).to(device)
-        store_parameters(model, 'test_file_parameters.pth')
+
     else:
         model = ODQA(k=K, max_sequence_length=MAX_SEQUENCE_LENGTH, batch_size=batch_size, embedding_matrix=embedding_matrix).to(device)
-        model = load_parameters(model, filepath=pretrained_parameters_filepath)
+        model.load_parameters(filepath=pretrained_parameters_filepath)
         model.reset_batch_size(batch_size)
 
-    # Print model's state_dict
-    print("Model's state_dict:")
-    for param_tensor in model.state_dict():
-        print(param_tensor, "\t", model.state_dict()[param_tensor].size())
+
+    # torch settings
+    #todo: check wheter ALL our parameters are in there e.g. candiate_representation
+    parameters = list(filter(lambda p: p.requires_grad, model.parameters()))
+    #todo: set these to proper values
+    optimizer = optim.RMSprop(parameters, lr=0.01, alpha=0.99, eps=1e-08, weight_decay=0, momentum=0, centered=False)
+    criterion = nn.CrossEntropyLoss()
+
     for epoch in range(num_epochs):
         for batch_number, data in enumerate(train_loader):
             print(f'epoch number {epoch} batch number {batch_number}.')
@@ -110,8 +105,15 @@ def batch_training(dataset, embedding_matrix, pretrained_parameters_filepath=Non
             question_as_strings = candidate_to_string(question)
             print(question_as_strings, predicted_answer_as_strings, ground_truth_answer_as_strings)
 
-
-
+            '''
+            optimizer.zero_grad()
+            batch_loss = Loss_Function.loss(predicted_answer, ground_truth_answer)
+            loss += batch_loss.item()
+            batch_loss.backward()
+            optimizer.step()
+            '''
+    # Save optimized parameters
+    model.store_parameters('test_file_parameters.pth')
 '''
 def test(model, dataset, batch_size):
     
@@ -182,7 +184,7 @@ def main(embedding_matrix, encoded_corpora):
 
             # Minibatch training
             dataset = qas.Question_Answer_Set(content)
-            batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10)
+            batch_training(dataset, embedding_matrix, pretrained_parameters_filepath=None, batch_size=100, num_epochs=10)
 
 if __name__ == '__main__':
     '''
