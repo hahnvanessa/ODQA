@@ -38,6 +38,16 @@ class ODQA(nn.Module):
     def reset_batch_size(self, batch_size):
         self.BATCH_SIZE = batch_size
 
+    def store_parameters(self, filepath):
+        # A common PyTorch convention is to save models using either a .pt or .pth file extension.
+        torch.save(self.state_dict(), filepath)
+        print('Stored parameters')
+
+    def load_parameters(self, filepath):
+        self.load_state_dict(torch.load(filepath))
+        print('Retrieved parameters')
+
+
     def extract_candidates(self, questions, contexts, q_len, c_len):
         '''
         Extracts the k candidates with the highest probability from each passage and returns their spans within
