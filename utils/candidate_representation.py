@@ -3,15 +3,14 @@ from torch import nn
 import torch.nn.functional as F
 
 
-class Candidate_Representation():
+class Candidate_Representation(nn.Module):
     '''
     Condense and interconnect candidates from different
     passages in order to improve the selection of an answer among them.
     '''
 
-    # todo: change this so that weights are given as parameters
     def __init__(self, k=2):
-        print('Started Candidate Representation.')
+        super(Candidate_Representation, self).__init__()
         self.k = k
         self.wb = nn.Linear(200, 100, bias=False) # not (100,200) because nn.linear transposes automatically
         self.we = nn.Linear(200, 100, bias=False)  # not (100,200) because nn.linear transposes automatically
