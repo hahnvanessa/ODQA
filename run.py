@@ -2,23 +2,26 @@ from argparse import ArgumentParser
 from utils.BILSTM import BiLSTM, attention, max_pooling
 import os
 import pickle
+#torch
 from torch import nn
 import torch
 from torch.nn.utils.rnn import pack_padded_sequence
 from torch.utils.data import Dataset, DataLoader
-import utils.question_answer_set as qas
-from utils.loss import Loss_Function
 from torch.nn.utils.rnn import pack_padded_sequence as pack
 from torch.nn.utils.rnn import pad_packed_sequence as unpack
 import torch.nn.functional as F
 from model.model import ODQA
 from torch import nn, optim
+# utils
+import utils.question_answer_set as question_answer_set
+from utils.loss import Loss_Function
+import utils.rename_unpickler as ru
 
 MAX_SEQUENCE_LENGTH = 100
 K = 2 # Number of extracted candidates per passage
 
 # todo: fix the paths here
-with open('outputs_numpy_encoding_v2//idx_2_word_dict.pkl', 'rb') as f:
+with open('/local/fgoessl/outputs/outputs_v4/idx_2_word_dict.pkl', 'rb') as f:
     idx_2_word_dic = pickle.load(f)
 
 def candidate_to_string(candidate, idx_2_word_dic=idx_2_word_dic):
@@ -75,6 +78,8 @@ def batch_training(dataset, embedding_matrix, pretrained_parameters_filepath=Non
     '''
     # Offer a sacrifice to the Cuda-God so that it may reward us with high accuracy
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    embedding_matrix = torch.Tensor(embedding_matrix).to(device)
+
 
     # Load Dataset with the dataloader
     train_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False)
@@ -180,10 +185,9 @@ def main(embedding_matrix, encoded_corpora):
 
     for file in file_paths:
         with open(os.path.join(file), 'rb') as f:
-            content = pickle.load(f)
+            dataset = ru.renamed_load(f)
 
             # Minibatch training
-            dataset = qas.Question_Answer_Set(content)
             batch_training(dataset, embedding_matrix, pretrained_parameters_filepath=None, batch_size=100, num_epochs=10)
 
 if __name__ == '__main__':
@@ -200,4 +204,5 @@ if __name__ == '__main__':
     '''
     # Call main()
     #main(embedding_matrix=args.embeddings, encoded_corpora=args.data)
-    main(embedding_matrix='embedding_matrix.pkl', encoded_corpora='outputs_numpy_encoding_v2')
+    main(embedding_matrix='/local/fgoessl/outputs/outputs_v4/embedding_matrix.pkl', encoded_corpora='/local/fgoessl/outputs/outputs_v4/QUA_Class_files')
+
