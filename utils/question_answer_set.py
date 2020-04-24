@@ -51,12 +51,11 @@ class Question_Answer_Set(Dataset):
                 # Check if context contains ground truth answer and return its answer span
                 answer_span = self.search_sequence_numpy(context, answer[np.nonzero(answer)])
                 self.gt_spans.append(answer_span)
-                self.gt_contexts.append(1) if answer_span[0] is not -1 else self.gt_contexts.append(0)
+                self.gt_contexts.append(1) if answer_span[0] != -1 else self.gt_contexts.append(0)
 
             self.questions[idx] = torch.from_numpy(question).type(torch.LongTensor)
             self.answers[idx] = torch.from_numpy(answer).type(torch.LongTensor)
         self.set_len = len(self.questionid_context_answerid)
-        print(self.gt_spans)
 
     def search_sequence_numpy(self, arr, seq):
         """ Find sequence in an array using NumPy only.
@@ -144,7 +143,6 @@ class Question_Answer_Set(Dataset):
         common_word_encoding = self.common_word_encoding_list[index]
         gt_contexts = self.gt_contexts[index]
         gt_span = self.gt_spans[index]
-        print(gt_span)
         return question, context, gt_contexts, answer, self.determine_length(question), self.determine_length(context), self.determine_length(answer), q_id, common_word_encoding, gt_span
 
 
