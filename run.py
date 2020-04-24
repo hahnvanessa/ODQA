@@ -86,10 +86,10 @@ def batch_training(dataset, embedding_matrix, pretrained_parameters_filepath=Non
 
     # Initialize model
     if pretrained_parameters_filepath == None:
-        model = ODQA(k=K, max_sequence_length=MAX_SEQUENCE_LENGTH, batch_size=batch_size, embedding_matrix=embedding_matrix).to(device)
+        model = ODQA(k=K, max_sequence_length=MAX_SEQUENCE_LENGTH, batch_size=batch_size, embedding_matrix=embedding_matrix, device=device).to(device)
 
     else:
-        model = ODQA(k=K, max_sequence_length=MAX_SEQUENCE_LENGTH, batch_size=batch_size, embedding_matrix=embedding_matrix).to(device)
+        model = ODQA(k=K, max_sequence_length=MAX_SEQUENCE_LENGTH, batch_size=batch_size, embedding_matrix=embedding_matrix, device=device).to(device)
         model.load_parameters(filepath=pretrained_parameters_filepath)
         model.reset_batch_size(batch_size)
 
