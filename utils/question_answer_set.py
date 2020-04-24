@@ -21,6 +21,7 @@ class Question_Answer_Set(Dataset):
         self.questions = {}
         self.answers = {}
         self.gt_contexts = []
+        self.gt_spans = []
 
         # Read in Dataset
         self.read_in_dataset(file_content)
@@ -47,11 +48,54 @@ class Question_Answer_Set(Dataset):
                 self.questionid_context_answerid.append((idx, torch.from_numpy(context).type(torch.LongTensor), idx))
                 # Encode common_words and append to storage
                 self.common_word_encoding_list.append(self.common_word_encoding(question, context))
-                # Check if context contains ground truth answer
-                self.gt_contexts.append(1) if np.all(np.in1d(answer[np.nonzero(answer)], context)) else self.gt_contexts.append(0)
+                # Check if context contains ground truth answer and return its answer span
+                answer_span = self.search_sequence_numpy(context, answer[np.nonzero(answer)])
+                self.gt_spans.append(answer_span)
+                self.gt_contexts.append(1) if answer_span.shape[0] is 0 else self.gt_contexts.append(0)
+
             self.questions[idx] = torch.from_numpy(question).type(torch.LongTensor)
             self.answers[idx] = torch.from_numpy(answer).type(torch.LongTensor)
         self.set_len = len(self.questionid_context_answerid)
+        print(self.gt_spans)
+
+    def search_sequence_numpy(self, arr, seq):
+        """ Find sequence in an array using NumPy only.
+
+        Parameters
+        ----------
+        arr    : input 1D array
+        seq    : input 1D array
+
+        Output
+        ------
+        Output : 1D Array of indices in the input array that satisfy the
+        matching of input sequence in the input array.
+        In case of no match, an empty list is returned.
+        """
+        #Source = https://stackoverflow.com/questions/36522220/searching-a-sequence-in-a-numpy-array/36524045#36524045
+        # Store sizes of input array and sequence
+        Na, Nseq = arr.size, seq.size
+
+        # Range of sequence
+        r_seq = np.arange(Nseq)
+
+        # Answer length
+        answer_len = seq.shape[0]
+
+        # Create a 2D array of sliding indices across the entire length of input array.
+        # Match up with the input sequence & get the matching starting indices.
+        M = (arr[np.arange(Na - Nseq + 1)[:, None] + r_seq] == seq).all(1)
+
+
+        # Get the range of those indices as final output
+        if M.any() > 0:
+            answer_start = np.where(np.convolve(M, np.ones((Nseq), dtype=int)) > 0)[0][0] # just find the first exact match
+            answer_end = answer_start + (answer_len - 1)
+            answer_span = torch.LongTensor([answer_start, answer_end])
+            return answer_span
+        else:
+            return torch.LongTensor([-1, -1]) # todo: find a better way to avoid using these
+
 
     def get_question(self, index):
         '''
@@ -99,7 +143,9 @@ class Question_Answer_Set(Dataset):
         answer = self.get_answer(index)
         common_word_encoding = self.common_word_encoding_list[index]
         gt_contexts = self.gt_contexts[index]
-        return question, context, gt_contexts, answer, self.determine_length(question), self.determine_length(context), self.determine_length(answer), q_id, common_word_encoding
+        gt_span = self.gt_spans[index]
+        print(gt_span)
+        return question, context, gt_contexts, answer, self.determine_length(question), self.determine_length(context), self.determine_length(answer), q_id, common_word_encoding, gt_span
 
 
     def set_max_len(self, max_len):
