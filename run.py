@@ -1,29 +1,33 @@
 from argparse import ArgumentParser
-from BILSTM import BiLSTM, attention, max_pooling
+from utils.BILSTM import BiLSTM, attention, max_pooling
 import os
 import pickle
+#torch
 from torch import nn
 import torch
 from torch.nn.utils.rnn import pack_padded_sequence
-import question_answer_set
 from torch.utils.data import Dataset, DataLoader
-import question_answer_set as qas
-import candidate_scoring
 from torch.nn.utils.rnn import pack_padded_sequence as pack
 from torch.nn.utils.rnn import pad_packed_sequence as unpack
-from candidate_representation import Candidate_Representation
 import torch.nn.functional as F
+from model.model import ODQA
+from torch import nn, optim
+# utils
+import utils.question_answer_set as question_answer_set
+from utils.loss import Loss_Function
+import utils.rename_unpickler as ru
 
 MAX_SEQUENCE_LENGTH = 100
 K = 2 # Number of extracted candidates per passage
 
 # todo: fix the paths here
-with open('outputs_numpy_encoding_v2//idx_2_word_dict.pkl', 'rb') as f:
+with open('/local/fgoessl/outputs/outputs_v4/idx_2_word_dict.pkl', 'rb') as f:
     idx_2_word_dic = pickle.load(f)
 
 def candidate_to_string(candidate, idx_2_word_dic=idx_2_word_dic):
     '''
-    Turns a tensor of indices into a string.
+    Turns a tensor of indices into a string. Basically gives us back. Can be used
+    to turn our candidates back into sentences.
     :param candidate:
     :param idx_2_word_dic:
     :return:
@@ -35,7 +39,7 @@ def candidate_to_string(candidate, idx_2_word_dic=idx_2_word_dic):
     print(values, indices)
     print(candidate_to_string(encoded_candidates[indices]))
     '''
-    return [idx_2_word_dic[i] for i in candidate.tolist()[0][0] if i != 0]
+    return [idx_2_word_dic[i] for i in candidate.tolist() if i != 0]
    
 
 
@@ -50,6 +54,7 @@ def get_distance(passages, candidates):
         passage_distances.append(position_distances.view(1,passages.shape[1]))
     return torch.squeeze(torch.stack(passage_distances, dim=0))
 
+
 def get_file_paths(data_dir):
     # Get paths for all files in the given directory
     file_names = []
@@ -60,7 +65,9 @@ def get_file_paths(data_dir):
                 file_names.append(os.path.join(r, file))
     return file_names
 
-def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
+
+# todo: batch size must be varied manually depending on whether we use searchqa or quasar
+def batch_training(dataset, embedding_matrix, pretrained_parameters_filepath=None, batch_size=100, num_epochs=10):
     '''
     Performs minibatch training. One datapoint is a question-context-answer pair.
     :param dataset:
@@ -69,111 +76,95 @@ def batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10):
     :param num_epochs:
     :return:
     '''
+    # Offer a sacrifice to the Cuda-God so that it may reward us with high accuracy
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    embedding_matrix = torch.Tensor(embedding_matrix).to(device)
+
+
     # Load Dataset with the dataloader
     train_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False)
 
-    # Store representations
-    qp_representations = {}
-    int_representations = {}
-    candidate_scores = {}
+    # Initialize model
+    if pretrained_parameters_filepath == None:
+        model = ODQA(k=K, max_sequence_length=MAX_SEQUENCE_LENGTH, batch_size=batch_size, embedding_matrix=embedding_matrix).to(device)
 
-    # Initialize BiLSTMs
-    qp_bilstm = BiLSTM(embedding_matrix, embedding_dim=300, hidden_dim=100,
-                batch_size=batch_size)
-    G_bilstm = nn.LSTM(input_size=400, hidden_size=100, bidirectional=True)
-    sq_bilstm = BiLSTM(embedding_matrix, embedding_dim=300, hidden_dim=100,
-                       batch_size=batch_size)  # is embedding dim correct? d_w, #fg: yes
-    sp_bilstm = nn.LSTM(input_size=501, hidden_size=100, bidirectional=True) #todo: padding function?
+    else:
+        model = ODQA(k=K, max_sequence_length=MAX_SEQUENCE_LENGTH, batch_size=batch_size, embedding_matrix=embedding_matrix).to(device)
+        model.load_parameters(filepath=pretrained_parameters_filepath)
+        model.reset_batch_size(batch_size)
 
-    fp_bilstm = nn.LSTM(input_size=403,hidden_size=100,bidirectional=True)
-    # Linear Transformations
-    wz = nn.Linear(200, 100, bias=False) # transpose of (100, 200)
 
+    # torch settings
+    #todo: check wheter ALL our parameters are in there e.g. candiate_representation
+    parameters = list(filter(lambda p: p.requires_grad, model.parameters()))
+    #todo: set these to proper values
+    optimizer = optim.RMSprop(parameters, lr=0.01, alpha=0.99, eps=1e-08, weight_decay=0, momentum=0, centered=False)
+    criterion = nn.CrossEntropyLoss()
 
     for epoch in range(num_epochs):
-
         for batch_number, data in enumerate(train_loader):
-            questions, contexts, answers, q_len, c_len, a_len, q_id, common_word_encodings = data
-            #filter out the ground-truth passages for pre-training
-            pretrain_contexts = contexts[gt_contexts.nonzero(),:]
-            pretrain_questions = questions[:pretrain_contexts.shape[0],:]
-            pretrain_answers = answers[:pretrain_contexts.shape[0],:]
-            #then use the pretrain versions for pre-training below
+            print(f'epoch number {epoch} batch number {batch_number}.')
+            predicted_answer, question, ground_truth_answer = model.forward(data)
+            predicted_answer_as_strings = candidate_to_string(predicted_answer)
+            ground_truth_answer_as_strings = candidate_to_string(ground_truth_answer)
+            question_as_strings = candidate_to_string(question)
+            print(question_as_strings, predicted_answer_as_strings, ground_truth_answer_as_strings)
 
+            '''
+            optimizer.zero_grad()
+            batch_loss = Loss_Function.loss(predicted_answer, ground_truth_answer)
+            loss += batch_loss.item()
+            batch_loss.backward()
+            optimizer.step()
+            '''
+    # Save optimized parameters
+    model.store_parameters('test_file_parameters.pth')
+'''
+def test(model, dataset, batch_size):
+    
+    Test on dev set.
+    :param model:
+    :return:
+    
+    # Load dataset
+    train_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False)
 
-            print('Started candidate extraction...')
-            # region Part 1 - Candidate Extraction
-            # Question and Passage Representation
-            q_representation = qp_bilstm.forward(questions, sentence_lengths=q_len) #[100, 100, 200]
-            c_representation = qp_bilstm.forward(contexts, sentence_lengths=c_len) #[100, 100, 200]
-            # Question and Passage Interaction
-            HP_attention = attention(q_representation, c_representation) #[100, 100, 200]
-            G_input = torch.cat((c_representation, HP_attention), 2)
-            G_ps, _ = G_bilstm.forward(G_input)
-            C_spans = []  # (100x2x2)
-            for G_p in G_ps:
-                # Store the spans of the top k candidates in the passage
-                C_spans.append(candidate_scoring.Candidate_Scorer(G_p).candidate_probabilities(K))  # candidate scores for current context
-            C_spans = torch.stack(C_spans, dim=0) #[100, 2, 2]
-            # if we create only one candidate scorer instance before (e.g. one for each question or one for all questions), we need to change the G_p argument
-            # endregion
+    # Set device
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-            # region Part 2 - Answer Selection
-            # Question Representation (Condensed Question)
-            print('Started Answer Selection...')
-            S_q = sq_bilstm.forward(questions, sentence_lengths=q_len)
-            r_q = max_pooling(S_q, MAX_SEQUENCE_LENGTH) #(100, 1, 200)
-            # Passage Representation
-            w_emb = qp_bilstm.embed(contexts) # word embeddings (100,100,300)
-            R_p = torch.cat((w_emb, common_word_encodings), 2)
-            R_p = torch.cat((R_p, r_q.expand(batch_size, MAX_SEQUENCE_LENGTH, 200)), 2) #(100,100,501)
-            packed_R_p = pack(R_p, c_len, batch_first=True, enforce_sorted=False)
-            S_p, _ = sp_bilstm.forward(packed_R_p)
-            S_p, _ = unpack(S_p, total_length=MAX_SEQUENCE_LENGTH)  #(100,100,200)
+    # Disable gradient as we do not conduct backpropagation
+    with torch.set_grad_enabled(False):
+        for batch_number, data in enumerate(train_loader):
+            model.forward(data)
+            batch_loss = criterion(p1, batch.s_idx) + criterion(p2, batch.e_idx)
+            loss += batch_loss.item()
 
-            # Candidate Representation
-            # todo: Do we need to share the weights among the multiple Candidate Rep classes? (Same goes for candidate scores?)
-            # In that case we would need to make the Candidate Rep functions take inputs e.g.
-            # generate_fused_representation(V). Right now the functions take these values directly from the class.
-            C_rep = Candidate_Representation(S_p=S_p, spans=C_spans, passages=contexts, k=K)
-            S_Cs = C_rep.S_Cs #[200, 100, 200]
-            r_Cs = C_rep.r_Cs #[200, 100]
-            r_Ctilde = C_rep.tilda_r_Cs #[200, 100]
-            encoded_candidates = C_rep.encoded_candidates
-            
-            # Passage Advanced Representation
-            S_P = torch.stack([S_p,S_p],dim=1).view(200,100,200) #reshape S_p
-            S_P_attention = attention(S_Cs, S_P) #[200,100,200]
-            U_p = torch.cat((S_P, S_P_attention), 2) #[200, 100, 400]
-            S_ps_distance =  get_distance(S_P,S_Cs)
-            U_p = torch.cat((U_p, S_ps_distance.view((200,100,1))), 2)
-            print('UP', U_p.shape)
-            U_p = torch.cat((U_p, r_Cs.view((200,100,1))), 2) 
-            print('UP', U_p.shape)
-            U_p = torch.cat((U_p, r_Ctilde.view((200,100,1))), 2) 
-            print('UP', U_p.shape)
-            packed_U_p = pack(U_p, c_len, batch_first=True, enforce_sorted=False)
-            F_p, _ = fp_bilstm.forward(packed_U_p)
-            F_p, _ = unpack(F_p, total_length=MAX_SEQUENCE_LENGTH)
-            print('FP', F_p.shape)
-            
-            # Answer Scoring
-            # answer size (#candidates, #max_seq_len, #output_dim)
-            # todo: REMOVE PLACEHOLDER!!!
-            z_C = max_pooling(F_p, MAX_SEQUENCE_LENGTH)
-            s = []
-            for c in z_C:
-                s.append(wz(c)) # wz:(200,100)
-            s = torch.stack(s, dim=0)
-            print(s.shape, 's shape')
-            input()
-            p_C = F.softmax(s, dim=0) # sum over the first dimension
-            # endregion
+            # (batch, c_len, c_len)
+            batch_size, c_len = p1.size()
+            ls = nn.LogSoftmax(dim=1)
+            mask = (torch.ones(c_len, c_len) * float('-inf')).to(device).tril(-1).unsqueeze(0).expand(batch_size, -1,
+                                                                                                      -1)
+            score = (ls(p1).unsqueeze(2) + ls(p2).unsqueeze(1)) + mask
+            score, s_idx = score.max(dim=1)
+            score, e_idx = score.max(dim=1)
+            s_idx = torch.gather(s_idx, 1, e_idx.view(-1, 1)).squeeze()
 
-            # region Part 3 - Loss
-            # endregion
+            for i in range(batch_size):
+                id = batch.id[i]
+                answer = batch.c_word[0][i][s_idx[i]:e_idx[i] + 1]
+                answer = ' '.join([data.WORD.vocab.itos[idx] for idx in answer])
+                answers[id] = answer
 
+        for name, param in model.named_parameters():
+            if param.requires_grad:
+                param.data.copy_(backup_params.get(name))
 
+    with open(args.prediction_file, 'w', encoding='utf-8') as f:
+        print(json.dumps(answers), file=f)
+
+    results = evaluate.main(args)
+    return loss, results['exact_match'], results['f1']
+'''
 
 def main(embedding_matrix, encoded_corpora):
     '''
@@ -194,11 +185,10 @@ def main(embedding_matrix, encoded_corpora):
 
     for file in file_paths:
         with open(os.path.join(file), 'rb') as f:
-            content = pickle.load(f)
+            dataset = ru.renamed_load(f)
 
             # Minibatch training
-            dataset = qas.Question_Answer_Set(content)
-            batch_training(dataset, embedding_matrix, batch_size=100, num_epochs=10)
+            batch_training(dataset, embedding_matrix, pretrained_parameters_filepath=None, batch_size=100, num_epochs=10)
 
 if __name__ == '__main__':
     '''
@@ -212,7 +202,7 @@ if __name__ == '__main__':
     # Parse given arguments
     args = parser.parse_args()
     '''
-
     # Call main()
     #main(embedding_matrix=args.embeddings, encoded_corpora=args.data)
-    main(embedding_matrix='embedding_matrix.pkl', encoded_corpora='outputs_numpy_encoding_v2')
+    main(embedding_matrix='/local/fgoessl/outputs/outputs_v4/embedding_matrix.pkl', encoded_corpora='/local/fgoessl/outputs/outputs_v4/QUA_Class_files')
+

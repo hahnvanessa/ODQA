@@ -35,6 +35,8 @@ class Question_Answer_Set(Dataset):
 
         # Read q,c,a and convert to torch tensors
         for idx, item in enumerate(content):
+            if idx % 1000 == 0:
+                print(idx)
             item_id = item
             question = content[item_id]['encoded_question']
             contexts = content[item_id]['encoded_contexts']
@@ -61,7 +63,6 @@ class Question_Answer_Set(Dataset):
         return self.questions[self.questionid_context_answerid[index][0]], self.questionid_context_answerid[index][0]
 
     def get_answer(self, index):
-        print(self.answers[self.questionid_context_answerid[index][2]])
         return self.answers[self.questionid_context_answerid[index][2]]
 
     def get_context(self, index):
