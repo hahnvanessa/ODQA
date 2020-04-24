@@ -12,13 +12,14 @@ from utils.candidate_representation import Candidate_Representation
 
 class ODQA(nn.Module):
 
-    def __init__ (self, k, max_sequence_length, batch_size, embedding_matrix):
+    def __init__ (self, k, max_sequence_length, batch_size, embedding_matrix, device)):
         super(ODQA, self).__init__()
         # Constants
         # todo: make this adjustable through args
         self.K = k
         self.MAX_SEQUENCE_LENGTH = max_sequence_length
         self.BATCH_SIZE = batch_size
+        self.device = device
 
         # Initialize BiLSTMs
         self.qp_bilstm = BiLSTM(embedding_matrix, embedding_dim=300, hidden_dim=100)
@@ -123,6 +124,17 @@ class ODQA(nn.Module):
 
     def forward(self, batch):
         questions, contexts, gt_contexts, answers, q_len, c_len, a_len, q_id, common_word_encodings = batch
+        # Feed to GPU
+        questions = questions.to(self.device)
+        contexts = contexts.to(self.device)
+        gt_contexts = gt_contexts.to(self.device)	
+        answers = answers.to(self.device)
+        q_len = q_len.to(self.device)
+        c_len = c_len.to(self.device)
+        a_len = a_len.to(self.device)
+        q_id  = q_id.to(self.device)
+        common_word_encodings = common_word_encodings.to(self.device)
+
         # Extract candidate spans form the passages
         C_spans = self.extract_candidates(questions, contexts, q_len, c_len)
         # Represents the passage as being dependent on the answer
