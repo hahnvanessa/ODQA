@@ -144,7 +144,6 @@ class Question_Answer_Set(Dataset):
         common_word_encoding = self.common_word_encoding_list[index]
         gt_contexts = self.gt_contexts[index]
         gt_span = self.gt_spans[index]
-        print(gt_span)
         return question, context, gt_contexts, answer, self.determine_length(question), self.determine_length(context), self.determine_length(answer), q_id, common_word_encoding, gt_span
 
 
