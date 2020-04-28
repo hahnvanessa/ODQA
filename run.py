@@ -16,10 +16,7 @@ from torch import nn, optim
 import utils.question_answer_set as question_answer_set
 from utils.loss import Loss_Function
 import utils.rename_unpickler as ru
-<<<<<<< HEAD
 
-=======
->>>>>>> origin/FabianHaupt
 
 MAX_SEQUENCE_LENGTH = 100
 K = 2 # Number of extracted candidates per passage
@@ -83,11 +80,6 @@ def batch_training(dataset, embedding_matrix, pretrained_parameters_filepath=Non
     # Offer a sacrifice to the Cuda-God so that it may reward us with high accuracy
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     embedding_matrix = torch.Tensor(embedding_matrix).to(device)
-
-<<<<<<< HEAD
-
-=======
->>>>>>> origin/FabianHaupt
 
     # Load Dataset with the dataloader
     train_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False, num_workers=8) #num_workers = 4 * num_gpu, but divide by half cuz sharing is caring
@@ -256,14 +248,9 @@ def main(embedding_matrix, encoded_corpora):
     '''
     for file in file_paths:
         with open(os.path.join(file), 'rb') as f:
-<<<<<<< HEAD
             print('Loading... ', f)
             dataset = ru.renamed_load(f)
             print(f)
-=======
-            dataset = ru.renamed_load(f)
->>>>>>> origin/FabianHaupt
-
             # Minibatch training
             batch_training(dataset, embedding_matrix, pretrained_parameters_filepath=None, batch_size=100, num_epochs=10)
     '''
@@ -282,7 +269,3 @@ if __name__ == '__main__':
     # Call main()
     #main(embedding_matrix=args.embeddings, encoded_corpora=args.data)
     main(embedding_matrix='/local/fgoessl/outputs/outputs_v4/embedding_matrix.pkl', encoded_corpora='/local/fgoessl/outputs/outputs_v4/QUA_Class_files')
-<<<<<<< HEAD
-=======
-
->>>>>>> origin/FabianHaupt
