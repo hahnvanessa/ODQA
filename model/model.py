@@ -71,7 +71,7 @@ class ODQA(nn.Module):
              C_spans.append(spans)
              k_max_list.append(k_max_scores)
         C_spans = torch.stack(C_spans, dim=0) #[100, 2, 2] # number of passages/ number of candidates/ spans
-        k_max_list = torch.stach(k_max_list, dim=0)
+        k_max_list = torch.stack(k_max_list, dim=0)
         return C_spans, k_max_list
     
     
@@ -99,7 +99,7 @@ class ODQA(nn.Module):
         R_p = torch.cat((R_p, r_q.expand(self.BATCH_SIZE, self.MAX_SEQUENCE_LENGTH, 200)), 2) #(100,100,501)
         packed_R_p = pack(R_p, c_len, batch_first=True, enforce_sorted=False)
         S_p, _ = self.sp_bilstm.forward(packed_R_p)
-        S_p, _ = unpack(S_p, total_length=self.MAX_SEQUENCE_LENGTH)  #(100,100,200)
+        S_p, _ = unpack(S_p, total_length=self.MAX_SEQUENCE_LENGTH, batch_first=True)  #(100,100,200)
         return S_p
 
 
@@ -114,7 +114,7 @@ class ODQA(nn.Module):
         U_p = torch.cat((U_p, r_Ctilde.view((200,100,1))), 2)
         packed_U_p = pack(U_p, c_len, batch_first=True, enforce_sorted=False)
         F_p, _ = self.fp_bilstm.forward(packed_U_p)
-        F_p, _ = unpack(F_p, total_length=self.MAX_SEQUENCE_LENGTH)
+        F_p, _ = unpack(F_p, total_length=self.MAX_SEQUENCE_LENGTH, batch_first=True)
         return F_p
 
 
@@ -158,7 +158,6 @@ class ODQA(nn.Module):
         q_id  = q_id.to(self.device)
         common_word_encodings = common_word_encodings.to(self.device)
         gt_spans = gt_spans.to(self.device)
-        input('stop here and wait')
     
         # Extract candidate spans form the passages
         if pretraining:
@@ -174,16 +173,16 @@ class ODQA(nn.Module):
             C_spans, k_max_list = self.extract_candidates(questions, contexts, q_len, c_len, k=self.MAX_SEQUENCE_LENGTH*self.MAX_SEQUENCE_LENGTH)
             #_, max_idx = k_max_list.max(1) # return indicies of max probabilities
             #max_spans = C_spans[torch.arange(C_spans.shape[0]).unsqueeze(-1), max_idx] # get spans with max probability (https://stackoverflow.com/questions/55628014/indexing-a-3d-tensor-using-a-2d-tensor)
-            gd_span_idxs = []
-            for i, gd_span in enumerate(gd_spans):
-                gd_span_idx = torch.where((C_spans[i]==gt_span).all(dim=1)) # find ground truth index in the spans
-                gd_span_idxs.append(gd_span_idx)
-            gd_span_idxs = torch.IntTensor(gd_span_idxs)
+            gt_span_idxs = []
+            for i, gt_span in enumerate(gt_spans):
+                gt_span_idx = torch.where((C_spans[i]==gt_span).all(dim=1)) # find ground truth index in the spans
+                gt_span_idxs.append(gt_span_idx)
+            gt_span_idxs = torch.LongTensor(gt_span_idxs).view(-1)
             k_max_list = k_max_list.view(k_max_list.shape[0],k_max_list.shape[1])
             # So the input to the CrossEntropyLoss would be 
             # k_max_list : where each row is a context and a columns contain probabilities of candidates
             # gd_span_idxs: a tensor with ground truth span indicies (classes)
-            return k_max_list, gd_span_idxs
+            return k_max_list, gt_span_idxs
         else:
             C_spans, _ = self.extract_candidates(questions, contexts, q_len, c_len, k=self.K)
             # Represents the passage as being dependent on the answer
