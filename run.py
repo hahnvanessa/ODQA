@@ -16,7 +16,9 @@ from torch import nn, optim
 import utils.question_answer_set as question_answer_set
 from utils.loss import Loss_Function
 import utils.rename_unpickler as ru
-
+# Init wandb
+import wandb
+wandb.init(project="ODQA")
 
 MAX_SEQUENCE_LENGTH = 100
 K = 2 # Number of extracted candidates per passage
@@ -86,7 +88,7 @@ def batch_training(dataset, embedding_matrix, pretrained_parameters_filepath=Non
 
     # Initialize model
     if pretrained_parameters_filepath == None:
-        model = ODQA(k=K, max_sequence_length=MAX_SEQUENCE_LENGTH, batch_size=batch_size, embedding_matrix=embedding_matrix, device=device).to(device) 	
+        model = ODQA(k=K, max_sequence_length=MAX_SEQUENCE_LENGTH, batch_size=batch_size, embedding_matrix=embedding_matrix, device=device).to(device)	
     else:
         model = ODQA(k=K, max_sequence_length=MAX_SEQUENCE_LENGTH, batch_size=batch_size, embedding_matrix=embedding_matrix, device=device).to(device)
         model.load_parameters(filepath=pretrained_parameters_filepath)
@@ -140,7 +142,7 @@ def pretraining(dataset, embedding_matrix, pretrained_parameters_filepath=None, 
     train_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False, num_workers=8) #num_workers = 4 * num_gpu, but divide by half cuz sharing is caring
 
     # Initialize model
-    model = ODQA(k=K, max_sequence_length=MAX_SEQUENCE_LENGTH, batch_size=batch_size, embedding_matrix=embedding_matrix, device=device).to(device) 	
+    model = ODQA(k=K, max_sequence_length=MAX_SEQUENCE_LENGTH, batch_size=batch_size, embedding_matrix=embedding_matrix, device=device).to(device)	
 
     parameters = list(filter(lambda p: p.requires_grad, model.parameters()))
     #todo: set these to proper values
@@ -156,7 +158,7 @@ def pretraining(dataset, embedding_matrix, pretrained_parameters_filepath=None, 
             #print(k_max_list[0].view(1,-1).shape, gt_span_idxs[0].shape)
             loss = criterion(k_max_list,gt_span_idxs)
             print('loss', loss)
- 		
+            wandb.log({'pretraining loss (extraction)':loss}, commit=False)	
             '''
             optimizer.zero_grad()
             batch_loss = Loss_Function.loss(predicted_answer, ground_truth_answer)
