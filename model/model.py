@@ -145,8 +145,8 @@ class ODQA(nn.Module):
     
 
     def forward(self, batch, pretraining=False):
-        if pretraining:
-            batch = self.select_pretrain_data(batch)
+        #if pretraining:
+        # = self.select_pretrain_data(batch)
         questions, contexts, gt_contexts, answers, q_len, c_len, a_len, q_id, common_word_encodings, gt_spans = batch
         questions = questions.to(self.device)
         contexts = contexts.to(self.device)

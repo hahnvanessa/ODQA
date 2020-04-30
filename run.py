@@ -123,7 +123,7 @@ def batch_training(dataset, embedding_matrix, pretrained_parameters_filepath=Non
 
 
 
-def pretraining(dataset, embedding_matrix, pretrained_parameters_filepath=None, batch_size=100, num_epochs=10):
+def pretraining(dataset, embedding_matrix, pretrained_parameters_filepath=None, batch_size=20, num_epochs=10):
     '''
     Performs minibatch training. One datapoint is a question-context-answer pair.
     :param dataset:
@@ -149,23 +149,26 @@ def pretraining(dataset, embedding_matrix, pretrained_parameters_filepath=None, 
     optimizer = optim.RMSprop(parameters, lr=0.01, alpha=0.99, eps=1e-08, weight_decay=0, momentum=0, centered=False)
     criterion = nn.CrossEntropyLoss() #https://stackoverflow.com/questions/49390842/cross-entropy-in-pytorch https://stackoverflow.com/questions/53936136/pytorch-inputs-for-nn-crossentropyloss
 
+    loss = 0
+
     for epoch in range(num_epochs):
         for batch_number, data in enumerate(train_loader):
             print(f'pretraining poch number {epoch} batch number {batch_number}.')
-            k_max_list, gt_span_idxs = model.forward(data, pretraining=True)
-            print('gt span shape', gt_span_idxs.shape)
-            # Pick only the first one because 
-            #print(k_max_list[0].view(1,-1).shape, gt_span_idxs[0].shape)
-            loss = criterion(k_max_list,gt_span_idxs)
-            print('loss', loss)
-            wandb.log({'pretraining loss (extraction)':loss}, commit=False)	
-            '''
-            optimizer.zero_grad()
-            batch_loss = Loss_Function.loss(predicted_answer, ground_truth_answer)
-            loss += batch_loss.item()
-            batch_loss.backward()
-            optimizer.step()
-            '''
+            data = model.select_pretrain_data(data)
+            if len(data[0]) != 0:
+                 k_max_list, gt_span_idxs = model.forward(data, pretraining=True)
+                 print('gt span shape', gt_span_idxs.shape)
+                 # Pick only the first one because 
+                 #print(k_max_list[0].view(1,-1).shape, gt_span_idxs[0].shape)
+                 batch_loss = criterion(k_max_list,gt_span_idxs)
+                 print('loss', batch_loss)
+                 wandb.log({'pretraining loss (extraction)':loss}, step=batch_number)	
+            
+                 optimizer.zero_grad()
+                 loss += batch_loss.item()
+                 batch_loss.backward()
+                 optimizer.step()
+            
     # Save optimized parameters
     model.store_parameters('test_file_parameters.pth')
 
@@ -241,7 +244,6 @@ def main(embedding_matrix, encoded_corpora):
     with open(testfile, 'rb') as f:
         print('Loading', f)
         dataset = ru.renamed_load(f)
-        print(f)
 
         # Minibatch training
         pretraining(dataset, embedding_matrix, pretrained_parameters_filepath=None, batch_size=100, num_epochs=10)
