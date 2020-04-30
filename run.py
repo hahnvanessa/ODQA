@@ -162,7 +162,7 @@ def pretraining(dataset, embedding_matrix, pretrained_parameters_filepath=None, 
                  #print(k_max_list[0].view(1,-1).shape, gt_span_idxs[0].shape)
                  batch_loss = criterion(k_max_list,gt_span_idxs)
                  print('loss', batch_loss)
-                 wandb.log({'pretraining loss (extraction)':loss}, step=batch_number)	
+                 wandb.log({'pretraining loss (extraction)': batch_loss}, step=batch_number)	
             
                  optimizer.zero_grad()
                  loss += batch_loss.item()
