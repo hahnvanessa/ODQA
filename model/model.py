@@ -140,6 +140,17 @@ class ODQA(nn.Module):
         pretrain_q_id =  torch.squeeze(q_id[gt_contexts.nonzero()])
         pretrain_common_word_encodings = torch.squeeze(contexts[gt_contexts.nonzero(),:])
         pretrain_gt_spans = torch.squeeze(gt_spans[gt_contexts.nonzero(),:])
+        if pretrain_q_len.dim() == 0:
+            pretrain_contexts = pretrain_contexts.view(1,-1)
+            pretrain_questions = pretrain_questions.view(1,-1)
+            pretrain_gt_contexts = pretrain_gt_contexts.view(1,-1)
+            pretrain_answers = pretrain_answers.view(1,-1) 
+            pretrain_q_len = pretrain_q_len.view(-1)
+            pretrain_a_len = pretrain_a_len.view(-1) 
+            pretrain_c_len = pretrain_c_len.view(-1)
+            pretrain_q_id = pretrain_q_id.view(-1)
+            pretrain_common_word_encodings = pretrain_common_word_encodings.view(1,-1)
+            pretrain_gt_spans = pretrain_gt_spans.view(1,-1)
         return pretrain_questions, pretrain_contexts, pretrain_gt_contexts, pretrain_answers, pretrain_q_len, pretrain_c_len, pretrain_a_len, pretrain_q_id, pretrain_common_word_encodings, pretrain_gt_spans
 
     
