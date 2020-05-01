@@ -28,6 +28,9 @@ class Candidate_Scorer(nn.Module):
 		upper_diagonal = torch.triu(candidate_probs) #set scores in lower triangular matrix to zero
 		H, W = upper_diagonal.shape
 		flattened = upper_diagonal.view(-1) #flatten to get top k scores of entire tensor
+		print(k)
 		k_max_values, flattened_indices = flattened.topk(k)
 		orig_indices = torch.cat(((flattened_indices // W).unsqueeze(1), (flattened_indices  % W).unsqueeze(1)), dim=1) #get indices from original, not flattened tensor
-		return orig_indices
+		return orig_indices, k_max_values
+
+
