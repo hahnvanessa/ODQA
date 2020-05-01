@@ -16,6 +16,7 @@ from torch import nn, optim
 import utils.question_answer_set as question_answer_set
 from utils.loss import Loss_Function
 import utils.rename_unpickler as ru
+from utils.pretraining import select_pretrain_data, pretrain_candidate_scoring, pretrain_answer_selection
 # Init wandb
 import wandb
 wandb.init(project="ODQA")
@@ -154,9 +155,9 @@ def pretraining(dataset, embedding_matrix, pretrained_parameters_filepath=None, 
     for epoch in range(num_epochs):
         for batch_number, data in enumerate(train_loader):
             print(f'pretraining poch number {epoch} batch number {batch_number}.')
-            data = model.select_pretrain_data(data)
+            data = select_pretrain_data(data)
             if len(data[0]) != 0:
-                 k_max_list, gt_span_idxs = model.forward(data, pretraining=True)
+                 k_max_list, gt_span_idxs = pretrain_candidate_scoring(model, data, MAX_SEQUENCE_LENGTH)
                  print('gt span shape', gt_span_idxs.shape)
                  # Pick only the first one because 
                  #print(k_max_list[0].view(1,-1).shape, gt_span_idxs[0].shape)
