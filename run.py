@@ -10,6 +10,7 @@ from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pack_padded_sequence as pack
 from torch.nn.utils.rnn import pad_packed_sequence as unpack
 import torch.nn.functional as F
+from torch.optim import lr_scheduler
 from model.model import ODQA
 from torch import nn, optim
 # utils
@@ -124,7 +125,7 @@ def batch_training(dataset, embedding_matrix, pretrained_parameters_filepath=Non
 
 
 
-def pretraining(dataset, embedding_matrix, pretrained_parameters_filepath=None, batch_size=20, num_epochs=10):
+def pretraining(dataset, embedding_matrix, pretrained_parameters_filepath, num_epochs, batch_size):
     '''
     Performs minibatch training. One datapoint is a question-context-answer pair.
     :param dataset:
@@ -147,29 +148,38 @@ def pretraining(dataset, embedding_matrix, pretrained_parameters_filepath=None, 
 
     parameters = list(filter(lambda p: p.requires_grad, model.parameters()))
     #todo: set these to proper values
-    optimizer = optim.RMSprop(parameters, lr=0.01, alpha=0.99, eps=1e-08, weight_decay=0, momentum=0, centered=False)
+    optimizer = optim.RMSprop(parameters, lr=args.lr, alpha=0.99, eps=1e-08, weight_decay=0, momentum=0, centered=False)
+    scheduler = lr_scheduler.StepLR(optimizer, step_size=1, gamma=0.1, last_epoch=-1)
     criterion = nn.CrossEntropyLoss() #https://stackoverflow.com/questions/49390842/cross-entropy-in-pytorch https://stackoverflow.com/questions/53936136/pytorch-inputs-for-nn-crossentropyloss
-
+    criterion.requires_grad = True
     loss = 0
-
+    step = 0
+    gd_batch = 0
     for epoch in range(num_epochs):
-        for batch_number, data in enumerate(train_loader):
-            print(f'pretraining poch number {epoch} batch number {batch_number}.')
+        for batch_number, data in enumerate(train_loader):          
+            print(f'pretraining poch number {epoch}/{num_epochs} batch number {batch_number}.')
             data = select_pretrain_data(data)
             if len(data[0]) != 0:
+                 gd_batch += 1
                  k_max_list, gt_span_idxs = pretrain_candidate_scoring(model, data, MAX_SEQUENCE_LENGTH)
-                 print('gt span shape', gt_span_idxs.shape)
-                 # Pick only the first one because 
-                 #print(k_max_list[0].view(1,-1).shape, gt_span_idxs[0].shape)
                  batch_loss = criterion(k_max_list,gt_span_idxs)
-                 print('loss', batch_loss)
-                 wandb.log({'pretraining loss (extraction)': batch_loss}, step=batch_number)	
+                 print('loss', batch_loss)	
             
                  optimizer.zero_grad()
                  loss += batch_loss.item()
                  batch_loss.backward()
                  optimizer.step()
-            
+                 #scheduler.step(batch_loss)
+                
+                 if gd_batch != 0 and gd_batch % 100 == 0:
+                     av_loss = loss / 100
+                     print(f'total loss per step {loss}')
+                     loss = 0
+                     wandb.log({'pretraining loss (extraction)': av_loss, 
+                                'lr': scheduler.get_lr()}, step=step)
+                     step += 1
+        scheduler.step()
+
     # Save optimized parameters
     model.store_parameters('test_file_parameters.pth')
 
@@ -247,7 +257,7 @@ def main(embedding_matrix, encoded_corpora):
         dataset = ru.renamed_load(f)
 
         # Minibatch training
-        pretraining(dataset, embedding_matrix, pretrained_parameters_filepath=None, batch_size=100, num_epochs=10)
+        pretraining(dataset, embedding_matrix, pretrained_parameters_filepath=None, batch_size=100, num_epochs=args.num_epochs)
 
   
     '''
@@ -260,17 +270,17 @@ def main(embedding_matrix, encoded_corpora):
             batch_training(dataset, embedding_matrix, pretrained_parameters_filepath=None, batch_size=100, num_epochs=10)
     '''
 if __name__ == '__main__':
-    '''
+   
     parser = ArgumentParser(
         description='Main ODQA script')
     parser.add_argument(
-        'embeddings', help='Path to the pkl file')
+        '--lr', default=0.00001, type=float, help='Learning rate value')
     parser.add_argument(
-        'data', help='Path to the folder with the pkl files')
+        '--num_epochs', default=10, type=int, help='The number of training epochs')
 
     # Parse given arguments
     args = parser.parse_args()
-    '''
+
     # Call main()
     #main(embedding_matrix=args.embeddings, encoded_corpora=args.data)
     main(embedding_matrix='/local/fgoessl/outputs/outputs_v4/embedding_matrix.pkl', encoded_corpora='/local/fgoessl/outputs/outputs_v4/QUA_Class_files')
