@@ -23,7 +23,7 @@ class BiLSTM(nn.Module):
     def forward(self, sentence, sentence_lengths):
         packed_x = pack(self.embedding(sentence), sentence_lengths, batch_first=True, enforce_sorted=False)
         lstm_out, _ = self.bilstm(packed_x)
-        lstm_out, lstm_out_lengths = unpack(lstm_out, total_length=100)
+        lstm_out, lstm_out_lengths = unpack(lstm_out, total_length=100, batch_first=True)
         return lstm_out
 
 def max_pooling(input_tensor, max_sequence_length):
