@@ -17,6 +17,7 @@ from torch import nn, optim
 import utils.question_answer_set as question_answer_set
 from utils.loss import Loss_Function
 import utils.rename_unpickler as ru
+
 from utils.pretraining import remove_data, pretrain_candidate_scoring, pretrain_answer_selection
 # Init wandb
 import wandb
@@ -190,8 +191,9 @@ def pretraining(dataset, embedding_matrix, pretrained_parameters_filepath, num_e
                                 'lr': scheduler.get_lr()}, step=step)
                      step += 1
         scheduler.step()
-
   
+
+
     #Pretrain Answer Selection
     freeze_candidate_extraction(model)
     parameters = list(filter(lambda p: p.requires_grad, model.parameters()))
@@ -199,7 +201,9 @@ def pretraining(dataset, embedding_matrix, pretrained_parameters_filepath, num_e
 
     for epoch in range(num_epochs):
         for batch_number, data in enumerate(train_loader):
+
             data = remove_data(data, remove_passages='empty')
+
             print(f'epoch number {epoch} batch number {batch_number}.')
             predicted_answer, question, ground_truth_answer = model.forward(data)
             predicted_answer_as_strings = candidate_to_string(predicted_answer)

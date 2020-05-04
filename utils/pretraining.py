@@ -1,5 +1,6 @@
 import torch
 
+
 def remove_data(batch, remove_passages='no_ground_truth'): 
     '''
     Removes passages that either do not contain the ground truth or consist of padding only.

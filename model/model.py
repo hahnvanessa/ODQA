@@ -96,6 +96,7 @@ class ODQA(nn.Module):
 		# Passage Representation
 		w_emb = self.qp_bilstm.embed(contexts) # word embeddings (100,100,300)
 		R_p = torch.cat((w_emb, common_word_encodings), 2)
+
 		R_p = torch.cat((R_p, r_q.expand(c_len.shape[0], self.MAX_SEQUENCE_LENGTH, 200)), 2) #(num_contexts,100,501)
 		packed_R_p = pack(R_p, c_len, batch_first=True, enforce_sorted=False)
 		S_p, _ = self.sp_bilstm.forward(packed_R_p)
@@ -105,6 +106,7 @@ class ODQA(nn.Module):
 
 
 	def compute_passage_advanced_representation(self, c_len, S_p, S_Cs, r_Cs, r_Ctilde):
+
 		num_contexts = c_len.shape[0]
 		S_P = torch.stack([S_p,S_p],dim=1).view(num_contexts*2,100,200) #reshape S_p
 		S_P_attention = attention(S_Cs, S_P) #[200,100,200]
