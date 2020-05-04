@@ -46,9 +46,19 @@ def candidate_to_string(candidate, idx_2_word_dic=idx_2_word_dic):
     '''
     return [idx_2_word_dic[i] for i in candidate.tolist() if i != 0]
    
-
+def freeze_candidate_extraction(model):
+    ''' Freezes the parameters in the candidate extraction part of the model'''
+    for p in model.qp_bilstm.parameters():
+        p.requires_grad = False
+    for p in model.G_bilstm.parameters():
+        p.requires_grad = False
+    for p in model.candidate_scorer.wb.parameters():
+        p.requires_grad = False
+    for p in model.candidate_scorer.we.parameters():
+        p.requires_grad = False
 
 def get_distance(passages, candidates):
+    ''' Distance feature for advanced passage representation between each position on passage and entire candidate'''
     passage_distances = []
     length = candidates.shape[0]
     for i in range(length):
@@ -179,6 +189,29 @@ def pretraining(dataset, embedding_matrix, pretrained_parameters_filepath, num_e
                                 'lr': scheduler.get_lr()}, step=step)
                      step += 1
         scheduler.step()
+    
+
+    #Pretrain Answer Selection
+    freeze_candidate_extraction(model)
+    parameters = list(filter(lambda p: p.requires_grad, model.parameters()))
+    optimizer = optim.RMSprop(parameters, lr=args.lr, alpha=0.99, eps=1e-08, weight_decay=0, momentum=0, centered=False)
+
+    for epoch in range(num_epochs):
+        for batch_number, data in enumerate(train_loader):
+            print(f'epoch number {epoch} batch number {batch_number}.')
+            predicted_answer, question, ground_truth_answer = model.forward(data)
+            predicted_answer_as_strings = candidate_to_string(predicted_answer)
+            ground_truth_answer_as_strings = candidate_to_string(ground_truth_answer)
+            question_as_strings = candidate_to_string(question)
+            print(question_as_strings, predicted_answer_as_strings, ground_truth_answer_as_strings)
+
+            '''
+            optimizer.zero_grad()
+            batch_loss = Loss_Function.loss(predicted_answer, ground_truth_answer)
+            loss += batch_loss.item()
+            batch_loss.backward()
+            optimizer.step()
+            '''
 
     # Save optimized parameters
     model.store_parameters('test_file_parameters.pth')
@@ -276,7 +309,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--lr', default=0.00001, type=float, help='Learning rate value')
     parser.add_argument(
-        '--num_epochs', default=10, type=int, help='The number of training epochs')
+        '--num_epochs', default=1, type=int, help='The number of training epochs')
 
     # Parse given arguments
     args = parser.parse_args()
