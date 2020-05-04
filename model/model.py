@@ -96,7 +96,8 @@ class ODQA(nn.Module):
 		# Passage Representation
 		w_emb = self.qp_bilstm.embed(contexts) # word embeddings (100,100,300)
 		R_p = torch.cat((w_emb, common_word_encodings), 2)
-		R_p = torch.cat((R_p, r_q.expand(self.BATCH_SIZE, self.MAX_SEQUENCE_LENGTH, 200)), 2) #(100,100,501)
+
+		R_p = torch.cat((R_p, r_q.expand(c_len.shape[0], self.MAX_SEQUENCE_LENGTH, 200)), 2) #(num_contexts,100,501)
 		packed_R_p = pack(R_p, c_len, batch_first=True, enforce_sorted=False)
 		S_p, _ = self.sp_bilstm.forward(packed_R_p)
 		S_p, _ = unpack(S_p, total_length=self.MAX_SEQUENCE_LENGTH, batch_first=True)  #(100,100,200)
@@ -105,13 +106,15 @@ class ODQA(nn.Module):
 
 
 	def compute_passage_advanced_representation(self, c_len, S_p, S_Cs, r_Cs, r_Ctilde):
-		S_P = torch.stack([S_p,S_p],dim=1).view(200,100,200) #reshape S_p
+
+		num_contexts = c_len.shape[0]
+		S_P = torch.stack([S_p,S_p],dim=1).view(num_contexts*2,100,200) #reshape S_p
 		S_P_attention = attention(S_Cs, S_P) #[200,100,200]
 		U_p = torch.cat((S_P, S_P_attention), 2) #[200, 100, 400]
 		S_ps_distance =  self.get_distance(S_P,S_Cs)
-		U_p = torch.cat((U_p, S_ps_distance.view((200,100,1))), 2)
-		U_p = torch.cat((U_p, r_Cs.view((200,100,1))), 2)
-		U_p = torch.cat((U_p, r_Ctilde.view((200,100,1))), 2)
+		U_p = torch.cat((U_p, S_ps_distance.view((num_contexts*2,100,1))), 2)
+		U_p = torch.cat((U_p, r_Cs.view((num_contexts*2,100,1))), 2)
+		U_p = torch.cat((U_p, r_Ctilde.view((num_contexts*2,100,1))), 2)
 		packed_U_p = pack(U_p, c_len, batch_first=True, enforce_sorted=False)
 		F_p, _ = self.fp_bilstm.forward(packed_U_p)
 		F_p, _ = unpack(F_p, total_length=self.MAX_SEQUENCE_LENGTH, batch_first=True)
