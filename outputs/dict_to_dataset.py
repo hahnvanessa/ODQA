@@ -1,4 +1,4 @@
-import utils/question_answer_set as quas
+import utils.question_answer_set as quas
 import pickle
 from collections import OrderedDict
 
