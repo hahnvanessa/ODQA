@@ -160,12 +160,19 @@ def pretraining(dataset, embedding_matrix, pretrained_parameters_filepath, num_e
     parameters = list(filter(lambda p: p.requires_grad, model.parameters()))
     #todo: set these to proper values
     optimizer = optim.RMSprop(parameters, lr=args.lr, alpha=0.99, eps=1e-08, weight_decay=0, momentum=0, centered=False)
-    scheduler = lr_scheduler.StepLR(optimizer, step_size=200, gamma=0.1, last_epoch=-1)
+    #scheduler = lr_scheduler.StepLR(optimizer, step_size=200, gamma=0.1, last_epoch=-1)
     criterion = nn.CrossEntropyLoss() #https://stackoverflow.com/questions/49390842/cross-entropy-in-pytorch https://stackoverflow.com/questions/53936136/pytorch-inputs-for-nn-crossentropyloss
     criterion.requires_grad = True
     loss = 0
     step = 0
     gd_batch = 0
+
+    if os.path.isfile('test_file_parameters.pth'):
+        parameters = torch.load('test_file_parameters.pth')
+        model.load_state_dict(parameters['model_state'])
+        optimizer.load_state_dict(parameters['optimizer_state'])
+        loss = parameters['loss'].clone()
+        step = parameters['step'] + 1
 
     for epoch in range(num_epochs):
         for batch_number, data in enumerate(tqdm(train_loader)):          
@@ -180,17 +187,17 @@ def pretraining(dataset, embedding_matrix, pretrained_parameters_filepath, num_e
                  loss += batch_loss.item()
                  batch_loss.backward() 
                  optimizer.step()
-                 scheduler.step(batch_loss)
+                 #scheduler.step(batch_loss)
                 
                  if gd_batch != 0 and gd_batch % 100 == 0:
                      av_loss = loss / 100
                      #print(f'total loss per step {loss}')
                      loss = 0
                      wandb.log({'pretraining loss (extraction)': av_loss, 
-                                'lr': scheduler.get_lr()[0].item()}, step=step)
+                                'lr': args.lr}, step=step)
                      step += 1
-        scheduler.step()
-    model.store_parameters('test_file_parameters.pth')
+        #scheduler.step()
+    model.store_parameters('test_file_parameters.pth', optimizer, batch_loss, step)
 
 
 '''
@@ -259,13 +266,14 @@ def main(embedding_matrix, encoded_corpora):
     int_representations = {}
 
     # Testing
-    testfile = '/local/fgoessl/outputs/outputs_v4/QUA_Class_files/qua_classenc_quasar_dev_short.pkl' #qua_classenc_quasar_dev_short.pkl' 
-    with open(testfile, 'rb') as f:
-        print('Loading', f)
-        dataset = ru.renamed_load(f)
+    testfiles = ['/local/fgoessl/outputs/outputs_v4/QUA_Class_files/qua_classenc_quasar_dev_short.pkl', '/local/fgoessl/outputs/outputs_v4/QUA_Class_files/qua_classenc_quasar_test_short.pkl'] #qua_classenc_quasar_dev_short.pkl' 
+    for testfile in testfiles:
+        with open(testfile, 'rb') as f:
+            print('Loading', f)
+            dataset = ru.renamed_load(f)
 
-        # Minibatch training
-        pretraining(dataset, embedding_matrix, pretrained_parameters_filepath=None, batch_size=100, num_epochs=args.num_epochs)
+            # Minibatch training
+            pretraining(dataset, embedding_matrix, pretrained_parameters_filepath=None, batch_size=100, num_epochs=args.num_epochs)
 
   
     '''

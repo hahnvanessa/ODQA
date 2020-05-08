@@ -40,9 +40,12 @@ class ODQA(nn.Module):
 	def reset_batch_size(self, batch_size):
 		self.BATCH_SIZE = batch_size
 
-	def store_parameters(self, filepath):
+	def store_parameters(self, filepath, optimizer, loss, step):
 		# A common PyTorch convention is to save models using either a .pt or .pth file extension.
-		torch.save(self.state_dict(), filepath)
+		torch.save({'model_state': self.state_dict(),
+                             'optimizer_state':optimizer.state_dict(),
+                             'loss':loss,
+                             'step': step}, filepath)
 		print('Stored parameters')
 
 	def load_parameters(self, filepath):
