@@ -1,6 +1,5 @@
 import torch
 
-
 def remove_data(batch, remove_passages='no_ground_truth'): 
     '''
     Removes passages that either do not contain the ground truth or consist of padding only.
@@ -51,14 +50,14 @@ def pretrain_candidate_scoring(model, dataset, MAX_SEQUENCE_LENGTH):
 	common_word_encodings = common_word_encodings.to(model.device)
 	gt_spans = gt_spans.to(model.device)
 
-	C_spans, k_max_list = model.extract_candidates(questions, contexts, q_len, c_len, k=MAX_SEQUENCE_LENGTH*MAX_SEQUENCE_LENGTH)
+	C_spans, k_max_list = model.extract_candidates(questions, contexts, q_len, c_len, k=MAX_SEQUENCE_LENGTH*MAX_SEQUENCE_LENGTH, pretraining=True)
 	#_, max_idx = k_max_list.max(1) # return indicies of max probabilities
 	#max_spans = C_spans[torch.arange(C_spans.shape[0]).unsqueeze(-1), max_idx] # get spans with max probability (https://stackoverflow.com/questions/55628014/indexing-a-3d-tensor-using-a-2d-tensor)
 	gt_span_idxs = []
 	for i, gt_span in enumerate(gt_spans):
 		gt_span_idx = torch.where((C_spans[i]==gt_span).all(dim=1)) # find ground truth index in the spans
 		gt_span_idxs.append(gt_span_idx)
-	gt_span_idxs = torch.LongTensor(gt_span_idxs).view(-1)
+	gt_span_idxs = torch.LongTensor(gt_span_idxs).view(-1).cuda()
 	k_max_list = k_max_list.view(k_max_list.shape[0],k_max_list.shape[1])
 	# So the input to the CrossEntropyLoss would be 
 	# k_max_list : where each row is a context and a columns contain probabilities of candidates
