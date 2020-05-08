@@ -4,7 +4,7 @@ from torch.nn.utils.rnn import pack_padded_sequence as pack
 from torch.nn.utils.rnn import pad_packed_sequence as unpack
 
 class BiLSTM(nn.Module):
-    def __init__(self, embedding_matrix, embedding_dim, hidden_dim, dropout=0.2):
+    def __init__(self, embedding_matrix, embedding_dim, hidden_dim, dropout=0.1):
         super(BiLSTM, self).__init__()
 
         #what about cuda? where do we need to specify GPU?
