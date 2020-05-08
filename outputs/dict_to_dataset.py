@@ -1,4 +1,4 @@
-import utils.question_answer_set as quas
+import question_answer_set as quas
 import pickle
 from collections import OrderedDict
 
@@ -31,15 +31,19 @@ def split_large_dataset(given_dict_path):
 	f1 = open(filename_first_half, "wb")
 	f2 = open(filename_second_half, "wb")
 	
-	print('Now storing...')
+	print('Now storing {filename_first_half} and {filename_second_half} ...')
 	pickle.dump(first_half_set,f1, protocol=4)
 	f1.close()
 	pickle.dump(second_half_set,f2,protocol=4)
 	f2.close()
+	return filename_first_half, filename_second_half
 		
 
 # Split and process largest dataset 
-split_large_dataset(searchqa_train)
+filename_first_half, filename_second_half = split_large_dataset(searchqa_train)
+f1_1, f1_2 = split_large_dataset(filename_first_half)
+f2_2, f2_2 = split_large_dataset(filename_second_half)
+
 # Process all other datasets
 for f in [quasar_train,quasar_dev,quasar_test,searchqa_val,searchqa_test]:
 	with open(f, 'rb') as fi:
