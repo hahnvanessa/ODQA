@@ -160,7 +160,7 @@ def pretraining(dataset, embedding_matrix, pretrained_parameters_filepath, num_e
     parameters = list(filter(lambda p: p.requires_grad, model.parameters()))
     #todo: set these to proper values
     optimizer = optim.RMSprop(parameters, lr=args.lr, alpha=0.99, eps=1e-08, weight_decay=0, momentum=0, centered=False)
-    scheduler = lr_scheduler.StepLR(optimizer, step_size=2000, gamma=0.1, last_epoch=-1)
+    scheduler = lr_scheduler.StepLR(optimizer, step_size=200, gamma=0.1, last_epoch=-1)
     criterion = nn.CrossEntropyLoss() #https://stackoverflow.com/questions/49390842/cross-entropy-in-pytorch https://stackoverflow.com/questions/53936136/pytorch-inputs-for-nn-crossentropyloss
     criterion.requires_grad = True
     loss = 0
@@ -178,9 +178,7 @@ def pretraining(dataset, embedding_matrix, pretrained_parameters_filepath, num_e
                  #print('batch loss....: ', batch_loss)	
                  optimizer.zero_grad()
                  loss += batch_loss.item()
-                 batch_loss.backward()
-                
-
+                 batch_loss.backward() 
                  optimizer.step()
                  scheduler.step(batch_loss)
                 
@@ -189,7 +187,7 @@ def pretraining(dataset, embedding_matrix, pretrained_parameters_filepath, num_e
                      #print(f'total loss per step {loss}')
                      loss = 0
                      wandb.log({'pretraining loss (extraction)': av_loss, 
-                                'lr': scheduler.get_lr()}, step=step)
+                                'lr': scheduler.get_lr()[0].item()}, step=step)
                      step += 1
         scheduler.step()
     model.store_parameters('test_file_parameters.pth')
