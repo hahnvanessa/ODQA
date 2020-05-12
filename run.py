@@ -114,7 +114,7 @@ def batch_training(dataset, embedding_matrix, pretrained_parameters_filepath=Non
     #todo: check wheter ALL our parameters are in there e.g. candiate_representation
     parameters = list(filter(lambda p: p.requires_grad, model.parameters()))
     #todo: set these to proper values
-    optimizer = optim.RMSprop(parameters, lr=0.01, alpha=0.99, eps=1e-08, weight_decay=0, momentum=0.00001, centered=False)
+    optimizer = optim.RMSprop(parameters, lr=0.01, alpha=0.99, eps=1e-08, weight_decay=0, momentum=0, centered=False)
     criterion = nn.CrossEntropyLoss() #https://stackoverflow.com/questions/49390842/cross-entropy-in-pytorch
 
     for epoch in range(num_epochs):
