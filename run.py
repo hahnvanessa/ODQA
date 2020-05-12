@@ -1,5 +1,6 @@
 from argparse import ArgumentParser
 from utils.BILSTM import BiLSTM, attention, max_pooling
+from utils.loss import reward
 import os
 import pickle
 import numpy as np
@@ -28,7 +29,7 @@ MAX_SEQUENCE_LENGTH = 100
 K = 2 # Number of extracted candidates per passage
 
 # todo: fix the paths here
-with open('/local/fgoessl/outputs/outputs_v4/idx_2_word_dict.pkl', 'rb') as f:
+with open('/local/fgoessl/outputs/outputs_v5/idx_2_word_dict.pkl', 'rb') as f:
     idx_2_word_dic = pickle.load(f)
 
 def candidate_to_string(candidate, idx_2_word_dic=idx_2_word_dic):
@@ -98,7 +99,7 @@ def batch_training(dataset, embedding_matrix, pretrained_parameters_filepath=Non
     embedding_matrix = torch.Tensor(embedding_matrix).to(device)
 
     # Load Dataset with the dataloader
-    train_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False, num_workers=8) #num_workers = 4 * num_gpu, but divide by half cuz sharing is caring
+    train_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False, num_workers=0) #num_workers = 4 * num_gpu, but divide by half cuz sharing is caring
 
     # Initialize model
     if pretrained_parameters_filepath == None:
@@ -132,6 +133,7 @@ def batch_training(dataset, embedding_matrix, pretrained_parameters_filepath=Non
             batch_loss.backward()
             optimizer.step()
             '''
+
     # Save optimized parameters
     model.store_parameters('test_file_parameters.pth')
 
@@ -153,14 +155,16 @@ def pretraining(dataset, embedding_matrix, pretrained_parameters_filepath, num_e
 
 
     # Load Dataset with the dataloader
-    train_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False, num_workers=8) #num_workers = 4 * num_gpu, but divide by half cuz sharing is caring
+    train_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False, num_workers=0) #num_workers = 4 * num_gpu, but divide by half cuz sharing is caring
 
     # Initialize model
+    '''
     model = ODQA(k=K, max_sequence_length=MAX_SEQUENCE_LENGTH, batch_size=batch_size, embedding_matrix=embedding_matrix, device=device).to(device)	
     parameters = list(filter(lambda p: p.requires_grad, model.parameters()))
     #todo: set these to proper values
     optimizer = optim.RMSprop(parameters, lr=args.lr, alpha=0.99, eps=1e-08, weight_decay=0, momentum=0, centered=False)
     #scheduler = lr_scheduler.StepLR(optimizer, step_size=200, gamma=0.1, last_epoch=-1)
+
     criterion = nn.CrossEntropyLoss() #https://stackoverflow.com/questions/49390842/cross-entropy-in-pytorch https://stackoverflow.com/questions/53936136/pytorch-inputs-for-nn-crossentropyloss
     criterion.requires_grad = True
     loss = 0
@@ -188,7 +192,7 @@ def pretraining(dataset, embedding_matrix, pretrained_parameters_filepath, num_e
                  batch_loss.backward() 
                  optimizer.step()
                  #scheduler.step(batch_loss)
-                
+
                  if gd_batch != 0 and gd_batch % 100 == 0:
                      av_loss = loss / 100
                      #print(f'total loss per step {loss}')
@@ -198,6 +202,44 @@ def pretraining(dataset, embedding_matrix, pretrained_parameters_filepath, num_e
                      step += 1
         #scheduler.step()
     model.store_parameters('test_file_parameters.pth', optimizer, batch_loss, step)
+
+    '''
+    #Pretrain Answer Selection
+    model = ODQA(k=K, max_sequence_length=MAX_SEQUENCE_LENGTH, batch_size=batch_size, embedding_matrix=embedding_matrix, device=device).to(device)
+    model.load_parameters(filepath="/local/fgoessl/test_n_stuff/trained_model_backup/test_file_parameters.pth")
+    model.reset_batch_size(batch_size)
+    freeze_candidate_extraction(model)
+    parameters = list(filter(lambda p: p.requires_grad, model.parameters()))
+    optimizer = optim.RMSprop(parameters, lr=args.lr, alpha=0.99, eps=1e-08, weight_decay=0, momentum=0, centered=False)
+    criterion = nn.CrossEntropyLoss() #https://stackoverflow.com/questions/49390842/cross-entropy-in-pytorch https://stackoverflow.com/questions/53936136/pytorch-inputs-for-nn-crossentropyloss
+    criterion.requires_grad = True
+    loss = 0
+    step = 0
+    gd_batch = 0
+
+    for epoch in range(num_epochs):
+        for batch_number, data in enumerate(train_loader):
+            data = remove_data(data, remove_passages='empty')
+            print(f'epoch number {epoch} batch number {batch_number}.')
+            if len(data[0]) != 0:
+                gd_batch += 1
+                candidates, candidate_scores, ground_truth_answer, max_index = model.forward(data, pretraining = True)
+                batch_loss = criterion(candidate_scores,max_index)
+                #print(candidate_scores)
+                print('batch loss....: ', batch_loss)   
+                optimizer.zero_grad()
+                loss += batch_loss.item()
+                batch_loss.backward()
+
+                optimizer.step()
+
+                if gd_batch != 0 and gd_batch % 100 == 0:
+                    av_loss = loss / 100
+                    loss = 0
+                    wandb.log({'pretraining 2 loss (extraction)': av_loss}, step=step)
+                    step += 1
+                
+    model.store_parameters('test_file_parameters.pth')
 
 
 '''
@@ -266,7 +308,8 @@ def main(embedding_matrix, encoded_corpora):
     int_representations = {}
 
     # Testing
-    testfiles = ['/local/fgoessl/outputs/outputs_v4/QUA_Class_files/qua_classenc_quasar_dev_short.pkl', '/local/fgoessl/outputs/outputs_v4/QUA_Class_files/qua_classenc_quasar_test_short.pkl'] #qua_classenc_quasar_dev_short.pkl' 
+
+   testfiles = ['/local/fgoessl/outputs/outputs_v4/QUA_Class_files/qua_classenc_quasar_dev_short.pkl', '/local/fgoessl/outputs/outputs_v4/QUA_Class_files/qua_classenc_quasar_test_short.pkl'] #qua_classenc_quasar_dev_short.pkl' 
     for testfile in testfiles:
         with open(testfile, 'rb') as f:
             print('Loading', f)
@@ -290,7 +333,7 @@ if __name__ == '__main__':
     parser = ArgumentParser(
         description='Main ODQA script')
     parser.add_argument(
-        '--lr', default=0.00001, type=float, help='Learning rate value')
+        '--lr', default=0.0001, type=float, help='Learning rate value')
     parser.add_argument(
         '--num_epochs', default=1, type=int, help='The number of training epochs')
 
@@ -299,4 +342,4 @@ if __name__ == '__main__':
 
     # Call main()
     #main(embedding_matrix=args.embeddings, encoded_corpora=args.data)
-    main(embedding_matrix='/local/fgoessl/outputs/outputs_v4/embedding_matrix.pkl', encoded_corpora='/local/fgoessl/outputs/outputs_v4/QUA_Class_files')
+    main(embedding_matrix='/local/fgoessl/outputs/outputs_v5/embedding_matrix.pkl', encoded_corpora='/local/fgoessl/outputs/outputs_v4/QUA_Class_files')
