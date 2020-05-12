@@ -104,7 +104,7 @@ class ODQA(nn.Module):
 
 
 
-	def compute_passage_advanced_representation(self, c_len, S_p, S_Cs, r_Cs, r_Ctilde):
+	def compute_passage_advanced_representation(self, candidate_len, c_len, S_p, S_Cs, r_Cs, r_Ctilde):
 		num_contexts = c_len.shape[0]
 		S_P = torch.stack([S_p,S_p],dim=1).view(num_contexts*2,100,200) #reshape S_p
 		S_P_attention = attention(S_Cs, S_P) #[200,100,200]
@@ -113,23 +113,24 @@ class ODQA(nn.Module):
 		U_p = torch.cat((U_p, S_ps_distance.view((num_contexts*2,100,1))), 2)
 		U_p = torch.cat((U_p, r_Cs.view((num_contexts*2,100,1))), 2)
 		U_p = torch.cat((U_p, r_Ctilde.view((num_contexts*2,100,1))), 2)
-		packed_U_p = pack(U_p, c_len, batch_first=True, enforce_sorted=False)
+		packed_U_p = pack(U_p, candidate_len, batch_first=True, enforce_sorted=False)
 		F_p, _ = self.fp_bilstm.forward(packed_U_p)
 		F_p, _ = unpack(F_p, total_length=self.MAX_SEQUENCE_LENGTH, batch_first=True)
 		return F_p
 
 
-	def score_answers(self, F_p):
+	def score_answers(self, F_p, pretraining = False):
 		z_C = max_pooling(F_p, self.MAX_SEQUENCE_LENGTH)
 		s = []
 		for c in z_C:
 			s.append(self.wz(c)) # wz:(200,100)
 		s = torch.stack(s, dim=0)
-		p_C = torch.softmax(s, dim=0)
+		if pretraining == True:
+			return s.squeeze().unsqueeze(dim=0) 
+		else:
+			return torch.softmax(s, dim=0) #p_C 
 
-		return p_C 
-
-	def forward(self, batch):
+	def forward(self, batch, pretraining = False):
 		questions, contexts, gt_contexts, answers, q_len, c_len, a_len, q_id, common_word_encodings, gt_spans = batch
 		questions = questions.to(self.device)
 		contexts = contexts.to(self.device)
@@ -151,13 +152,21 @@ class ODQA(nn.Module):
 		r_Cs = self.candidate_representation.r_Cs  # [200, 100]
 		r_Ctilde = self.candidate_representation.tilda_r_Cs  # [200, 100]
 		encoded_candidates = self.candidate_representation.encoded_candidates
+		candidate_lengths = []
+		for candidate in encoded_candidates:
+			candidate_len = (candidate != 0).sum()
+			if candidate_len > 0:
+				candidate_lengths.append(candidate_len)
+			else:
+				candidate_lengths.append(torch.tensor(1).cuda())
+		torch.stack(candidate_lengths, dim=0)
 		# Compute an advanced representation of the passage
-		F_p = self.compute_passage_advanced_representation(c_len=c_len, S_p=S_p, S_Cs=S_Cs, r_Cs=r_Cs, r_Ctilde= r_Ctilde)
+		F_p = self.compute_passage_advanced_representation(candidate_len = candidate_lengths, c_len=c_len, S_p=S_p, S_Cs=S_Cs, r_Cs=r_Cs, r_Ctilde= r_Ctilde)
 		# Commpute the probabilities of the candidates (highest should be the ground truth answer)
-		p_C = self.score_answers(F_p)
+		p_C = self.score_answers(F_p, pretraining)
 		# Return the embedding-index version of the candidate with the highest probability
 		# todo: check if this works and if this always returns only one  value
-		value, index = torch.max(p_C, 0)
+		#value, index = torch.max(p_C, 0)
 		# todo: Maybe we can use the value to find out how certain the algorithm is about our candidate
 		# todo: returns only one answer for all the datapoints
-		return encoded_candidates[index][0][0], questions[0], answers[0]
+		return encoded_candidates, p_C, answers[0] #encoded_candidates[index][0][0], questions[0], answers[0]

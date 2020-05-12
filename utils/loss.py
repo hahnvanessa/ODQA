@@ -19,11 +19,10 @@ def reward(c, a, c_len, a_len):
     :param answer:
     :return:
     '''
-
-    def f1_score(c, a, c_len, a_len, epsilon=1e-7):
+    def f1_score(c, a, epsilon=1e-7):
         # source for reference: https://gist.github.com/SuperShinyEyes/dcc68a08ff8b615442e3bc6a9b55a354
-        y_true = torch.ones(c.shape, dtype=torch.bool).long()
-        y_pred = torch.eq(c, a).long()
+        y_true = torch.ones(c.shape, dtype=torch.bool).long().cuda()
+        y_pred = torch.eq(c, a).long().cuda()
         tp = (y_true * y_pred).sum().to(torch.float32)
         tn = ((1 - y_true) * (1 - y_pred)).sum().to(torch.float32)
         fp = ((1 - y_true) * y_pred).sum().to(torch.float32)
@@ -36,13 +35,15 @@ def reward(c, a, c_len, a_len):
         return f1
 
     # Trim padding to candidate len
-    assert c_len >= a_len
-    c = c[0, :c_len]
-    a = a[0, :c_len]
+    #assert c_len >= a_len
+    ca_len = max(c_len, a_len)
+    c = c[:ca_len] #c[0, :c_len]
+    a = a[:ca_len] #a[0, :c_len]
+
 
     if torch.all(torch.eq(c, a)):
         return 2
     elif len(torch.eq(c, a).nonzero()) > 0:
-        return f1_score(c, a, c_len, a_len)
+        return f1_score(c, a)
     else:
         return -1
