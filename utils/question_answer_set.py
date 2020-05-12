@@ -1,8 +1,10 @@
 import torch
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
+from itertools import repeat
 
 MAX_SEQUENCE_LENGTH = 100
+CONTEXTS_PER_QUESTION = 100
 
 class Question_Answer_Set(Dataset):
     '''
@@ -14,6 +16,7 @@ class Question_Answer_Set(Dataset):
     def __init__(self, file_content):
         # some index is reached
         self.set_len = None
+        self.padding_context = np.zeros(MAX_SEQUENCE_LENGTH, dtype=np.int64)
 
         # Tensor storage
         self.questionid_context_answerid = []
@@ -42,6 +45,13 @@ class Question_Answer_Set(Dataset):
             question = content[item_id]['encoded_question']
             contexts = content[item_id]['encoded_contexts']
             answer = content[item_id]['encoded_answer']
+
+            # Add padding contexts (because not all questions are assigned 100 contexts/passages)
+            num_padding_contexts = CONTEXTS_PER_QUESTION - len(contexts)
+            if num_padding_contexts > 0:
+                contexts.extend(repeat(self.padding_context, num_padding_contexts))
+            assert len(contexts) == CONTEXTS_PER_QUESTION
+            
             # Store questions, contexts and answers as tensors
             for context in contexts:
                 # Save context tensor to storage
