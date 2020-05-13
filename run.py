@@ -60,18 +60,6 @@ def freeze_candidate_extraction(model):
     for p in model.candidate_scorer.we.parameters():
         p.requires_grad = False
 
-def get_distance(passages, candidates):
-    ''' Distance feature for advanced passage representation between each position on passage and entire candidate'''
-    passage_distances = []
-    length = candidates.shape[0]
-    for i in range(length):
-        position_distances = []
-        for p in range(passages.shape[1]):
-            position_distances.append(torch.dist(passages[i,p,:], candidates[i,:,:]))
-        position_distances = torch.stack(position_distances, dim=0)
-        passage_distances.append(position_distances.view(1,passages.shape[1]))
-    return torch.squeeze(torch.stack(passage_distances, dim=0))
-
 
 def get_file_paths(data_dir):
     # Get paths for all files in the given directory
