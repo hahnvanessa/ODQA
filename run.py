@@ -275,6 +275,7 @@ if __name__ == '__main__':
         '--input_train', help='Path to the folder containing training files')
     parser.add_argument(
         '--input_test', help='Path to the folder containing test files')
+    args = parser.parse_args()
 
     # Parse given arguments
     args = parser.parse_args()
