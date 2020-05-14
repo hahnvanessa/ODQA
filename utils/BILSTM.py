@@ -31,15 +31,81 @@ def max_pooling(input_tensor, max_sequence_length):
     mxp = nn.MaxPool2d((max_sequence_length, 1),stride=1)
     return mxp(input_tensor)
 
-def attention(question, context):
-    # assuming that input for question and context has dim 54x300 respectively and not 54x1x300
-    numerator = torch.exp(torch.bmm(question, torch.transpose(context, 1, 2)))
-    denominator = torch.sum(numerator) #index 0?
-    alpha_tk = torch.div(numerator,denominator) #->dim 54,54
 
-    h_tP = torch.bmm(alpha_tk, question) #->dim 1,300
+def attention(questions, contexts):
+    max_value = torch.max(torch.max(torch.bmm(questions, torch.transpose(contexts, 1, 2))))
+    numerator = torch.exp(torch.bmm(questions, torch.transpose(contexts, 1, 2)) - max_value)
+    denominator = torch.sum(numerator)#, dim=1).view(numerator.shape[0], 1, numerator.shape[2]) #this cannot be just a single number.It must at least have t values since we have t words in a passage.
+    print('attention nominator shape', numerator.shape)
+    print('attention denominator', denominator.shape)
+    alpha_tk = torch.div(numerator,denominator) #->dim 54,54
+    #alpha_tk = nn.Softmax()(numerator)
+    #print(alpha_tk)
+    print('Sum alpha_tk', torch.sum(alpha_tk), alpha_tk.shape)
+    
+
+    h_tP = torch.bmm(alpha_tk, questions) #->dim 1,300
 
     #H_P = torch.cat(, dim=0) #dim -> 54,300
     #is h_tP already H_P?
     H_P = h_tP # for now
+    print('sum attention', torch.sum(H_P))
     return H_P
+
+'''
+def attention(all_questions, all_contexts):
+    # assuming that input for question and context has dim 54x300 respectively and not 54x1x300
+
+    def attention_sub(question, context):print(f'shapes {question.shape}, {context.shape}')
+        # assuming that input for question and context has dim 54x300 respectively and not 54x1x300
+        max_value = torch.max(torch.bmm(question, torch.transpose(context, 1, 2)))
+
+        numerator = torch.exp(torch.bmm(question, torch.transpose(context, 1, 2))- max_value) 
+        denominator = torch.sum(numerator) #index 0?
+
+        alpha_tk = torch.div(numerator,denominator) #->dim 54,54
+
+
+        h_tP = torch.bmm(alpha_tk, question) #->dim 1,300
+     
+        return H_P
+
+    H_Ps = []
+    for c in all_contexts:
+        H_Ps.append(attention_sub(all_questions[0], c))
+    H_Ps = torch.stack(H_Ps, dim=0)
+    print(f'H_P shape is {H_Ps.shape}')
+    return H_Ps
+
+
+'''
+
+
+
+
+
+'''
+def attention(all_questions, all_contexts):
+    # assuming that input for question and context has dim 54x300 respectively and not 54x1x300
+
+    def attention_sub(question, context):
+        question = question.view(question.shape[0], 1, 200)
+        context = context.view(1, context.shape[0], 200)
+        numerator = torch.exp(question*context)
+        denominator = torch.sum(numerator, dim=0)
+        alphas = numerator/denominator
+        
+        H_P = []
+        for i in range(alphas.shape[0]):
+            H_P.append(torch.sum(alphas[i]*question[i], dim=0))
+            
+        H_P = torch.stack(H_P, dim=0)
+        return H_P
+
+    H_Ps = []
+    for c in all_contexts:
+        H_Ps.append(attention_sub(all_questions[0], c))
+    H_Ps = torch.stack(H_Ps, dim=0)
+    print(f'H_P shape is {H_Ps.shape}')
+    return H_Ps
+'''
