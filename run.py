@@ -161,7 +161,7 @@ def train(dataset, embedding_matrix, pretrained_parameters_filepath, num_epochs,
     gd_batch = 0
 
     for epoch in range(num_epochs):
-        for batch_number, data in enumerate(train_loader):
+        for batch_number, data in enumerate(tqdm(train_loader)):
             data = remove_data(data, remove_passages='empty')
             if len(data[0]) != 0:
                 gd_batch += 1
@@ -180,7 +180,7 @@ def train(dataset, embedding_matrix, pretrained_parameters_filepath, num_epochs,
                     wandb.log({'pretraining 2 loss (selection)': av_loss}, step=step)
                     step += 1
                 
-    model.store_parameters('test_file_parameters.pth')
+    model.store_parameters('test_file_parameters.pth', optimizer, batch_loss, step)
 
 
 '''
@@ -252,7 +252,7 @@ def main(embedding_matrix, encoded_corpora):
             print('Loading', f)
             dataset = ru.renamed_load(f)
             pretrain(dataset, embedding_matrix, pretrained_parameters_filepath=None, batch_size=100, num_epochs=args.num_epochs)
-
+   
 
     # Train Answer selection part
     for testfile in testfiles:
