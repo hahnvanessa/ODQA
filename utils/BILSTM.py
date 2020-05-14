@@ -32,15 +32,18 @@ def max_pooling(input_tensor, max_sequence_length):
     return mxp(input_tensor)
 
 def attention(questions, contexts):
-    # assuming that input for question and context has dim 54x300 respectively and not 54x1x300
-    numerator = torch.exp(torch.bmm(question, torch.transpose(context, 1, 2)))
-    denominator = torch.sum(numerator) #index 0?
-    alpha_tk = torch.div(numerator,denominator) #->dim 54,54
+    max_value = torch.max(torch.max(torch.bmm(questions, torch.transpose(contexts, 1, 2))))
+    numerator = torch.exp(torch.bmm(questions, torch.transpose(contexts, 1, 2)) - max_value)
+    denominator = torch.sum(numerator)#, dim=1).view(numerator.shape[0], 1, numerator.shape[2]) #this cannot be just a single number.It must at least have t values since we have t words in a passage.
 
-    h_tP = torch.bmm(alpha_tk, question) #->dim 1,300
+    alpha_tk = torch.div(numerator,denominator) #->dim 54,54
+    
+
+    h_tP = torch.bmm(alpha_tk, questions) #->dim 1,300
 
     #H_P = torch.cat(, dim=0) #dim -> 54,300
     #is h_tP already H_P?
     H_P = h_tP # for now
+    print('sum attention', torch.sum(H_P))
     return H_P
     
