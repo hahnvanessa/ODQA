@@ -20,7 +20,7 @@ from torch import nn, optim
 import utils.question_answer_set as question_answer_set
 from utils.loss import Loss_Function
 import utils.rename_unpickler as ru
-from utils.pretraining import remove_data, pretrain_candidate_scoring, pretrain_answer_selection
+from utils.pretraining import remove_data, pretrain_candidate_scoring
 # Init wandb
 import wandb
 wandb.init(project="ODQA")
@@ -28,11 +28,8 @@ wandb.init(project="ODQA")
 MAX_SEQUENCE_LENGTH = 100
 K = 2 # Number of extracted candidates per passage
 
-# todo: fix the paths here
-with open('/local/fgoessl/outputs/outputs_v5/idx_2_word_dict.pkl', 'rb') as f:
-    idx_2_word_dic = pickle.load(f)
 
-def candidate_to_string(candidate, idx_2_word_dic=idx_2_word_dic):
+def candidate_to_string(candidate, idx_2_word_dic):
     '''
     Turns a tensor of indices into a string. Basically gives us back. Can be used
     to turn our candidates back into sentences.
@@ -72,7 +69,7 @@ def get_file_paths(data_dir):
     return file_names
 
 
-def pretrain(dataset, embedding_matrix, pretrained_parameters_filepath, num_epochs, batch_size):
+def pretrain(dataset, embedding_matrix, num_epochs, batch_size):
     '''
     Performs minibatch pre-training of the Candidate Extraction Module. 
     One datapoint is a question-context-answer pair.
@@ -230,36 +227,35 @@ def test(model, dataset, batch_size):
     return loss, results['exact_match'], results['f1']
 '''
 
-def main(embedding_matrix, encoded_corpora):
+def main(embedding_matrix, id2v, train_corpora, test_corpora):
     '''
     Iterates through all given corpus files and forwards the encoded contexts and questions
     through the BILSTMs.
     :param embedding_matrix:
     :param encoded_corpora:
     '''
-
+    with open(id2v, 'rb') as f:
+        idx_2_word_dic = pickle.load(f)
+    
     embedding_matrix = pickle.load(open(embedding_matrix, 'rb'))
     print('embedding matrix loaded')
 
     # Retrieve the filepaths of all encoded corpora
-    file_paths = get_file_paths(encoded_corpora)
-
-    testfiles = ['/local/fgoessl/outputs/outputs_v4/QUA_Class_files/qua_classenc_quasar_dev_short.pkl', '/local/fgoessl/outputs/outputs_v4/QUA_Class_files/qua_classenc_quasar_test_short.pkl'] #qua_classenc_quasar_dev_short.pkl' 
+    train_files = get_file_paths(train_corpora)
     
     # Train Candidate Selection part
-    for testfile in testfiles:
-        with open(testfile, 'rb') as f:
+    for file in train_files:
+        with open(file, 'rb') as f:
             print('Loading', f)
             dataset = ru.renamed_load(f)
-            pretrain(dataset, embedding_matrix, pretrained_parameters_filepath=None, batch_size=100, num_epochs=args.num_epochs)
+            pretrain(dataset, embedding_matrix, batch_size=100, num_epochs=args.num_epochs)
    
-
     # Train Answer selection part
-    for testfile in testfiles:
-        with open(testfile, 'rb') as f:
+    for file in train_files:
+        with open(file, 'rb') as f:
             print('Loading', f)
             dataset = ru.renamed_load(f)
-            train(dataset, embedding_matrix, pretrained_parameters_filepath=None, batch_size=100, num_epochs=args.num_epochs)
+            train(dataset, embedding_matrix, batch_size=100, num_epochs=args.num_epochs)
   
 
 if __name__ == '__main__':
@@ -270,9 +266,18 @@ if __name__ == '__main__':
         '--lr', default=0.0001, type=float, help='Learning rate value')
     parser.add_argument(
         '--num_epochs', default=1, type=int, help='The number of training epochs')
+    parser.add_argument(
+        '--emb', help='Path to the embedding matrix file')
+    parser.add_argument(
+        '--id2v', help='Path to the idx to word dictionary file')
+    parser.add_argument(
+        '--input_train', help='Path to the folder containing training files')
+    parser.add_argument(
+        '--input_test', help='Path to the folder containing test files')
+    args = parser.parse_args()
 
     # Parse given arguments
     args = parser.parse_args()
 
     # Call main()
-    main(embedding_matrix='/local/fgoessl/outputs/outputs_v5/embedding_matrix.pkl', encoded_corpora='/local/fgoessl/outputs/outputs_v4/QUA_Class_files')
+    main(embedding_matrix=args.emb, id2v=args.id2v, train_corpora=args.input_train, test_corpora=args.input_test)
