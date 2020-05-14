@@ -29,7 +29,7 @@ MAX_SEQUENCE_LENGTH = 100
 K = 2 # Number of extracted candidates per passage
 
 # todo: fix the paths here
-with open('/local/fgoessl/outputs/outputs_v5/idx_2_word_dict.pkl', 'rb') as f:
+with open(args.id2w, 'rb') as f:
     idx_2_word_dic = pickle.load(f)
 
 def candidate_to_string(candidate, idx_2_word_dic=idx_2_word_dic):
@@ -72,7 +72,7 @@ def get_file_paths(data_dir):
     return file_names
 
 
-def pretrain(dataset, embedding_matrix, pretrained_parameters_filepath, num_epochs, batch_size):
+def pretrain(dataset, embedding_matrix, num_epochs, batch_size):
     '''
     Performs minibatch pre-training of the Candidate Extraction Module. 
     One datapoint is a question-context-answer pair.
@@ -230,7 +230,7 @@ def test(model, dataset, batch_size):
     return loss, results['exact_match'], results['f1']
 '''
 
-def main(embedding_matrix, encoded_corpora):
+def main(embedding_matrix, train_corpora, test_corpora):
     '''
     Iterates through all given corpus files and forwards the encoded contexts and questions
     through the BILSTMs.
@@ -242,24 +242,21 @@ def main(embedding_matrix, encoded_corpora):
     print('embedding matrix loaded')
 
     # Retrieve the filepaths of all encoded corpora
-    file_paths = get_file_paths(encoded_corpora)
-
-    testfiles = ['/local/fgoessl/outputs/outputs_v4/QUA_Class_files/qua_classenc_quasar_dev_short.pkl', '/local/fgoessl/outputs/outputs_v4/QUA_Class_files/qua_classenc_quasar_test_short.pkl'] #qua_classenc_quasar_dev_short.pkl' 
+    train_files = get_file_paths(args.train_corpora)
     
     # Train Candidate Selection part
-    for testfile in testfiles:
-        with open(testfile, 'rb') as f:
+    for file in train_files:
+        with open(file, 'rb') as f:
             print('Loading', f)
             dataset = ru.renamed_load(f)
-            pretrain(dataset, embedding_matrix, pretrained_parameters_filepath=None, batch_size=100, num_epochs=args.num_epochs)
+            pretrain(dataset, embedding_matrix, batch_size=100, num_epochs=args.num_epochs)
    
-
     # Train Answer selection part
-    for testfile in testfiles:
-        with open(testfile, 'rb') as f:
+    for file in train_files:
+        with open(file, 'rb') as f:
             print('Loading', f)
             dataset = ru.renamed_load(f)
-            train(dataset, embedding_matrix, pretrained_parameters_filepath=None, batch_size=100, num_epochs=args.num_epochs)
+            train(dataset, embedding_matrix, batch_size=100, num_epochs=args.num_epochs)
   
 
 if __name__ == '__main__':
@@ -270,9 +267,17 @@ if __name__ == '__main__':
         '--lr', default=0.0001, type=float, help='Learning rate value')
     parser.add_argument(
         '--num_epochs', default=1, type=int, help='The number of training epochs')
+    parser.add_argument(
+        '--emb', help='Path to the embedding matrix file')
+    parser.add_argument(
+        '--id2w', help='Path to the idx to word dictionary file')
+    parser.add_argument(
+        '--input_train', help='Path to the folder containing training files')
+    parser.add_argument(
+        '--input_test', help='Path to the folder containing test files')
 
     # Parse given arguments
     args = parser.parse_args()
 
     # Call main()
-    main(embedding_matrix='/local/fgoessl/outputs/outputs_v5/embedding_matrix.pkl', encoded_corpora='/local/fgoessl/outputs/outputs_v4/QUA_Class_files')
+    main(embedding_matrix=args.emb, train_corpora=args.input_train, test_corpora=args.input_test)
