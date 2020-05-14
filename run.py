@@ -108,6 +108,7 @@ def pretrain(dataset, embedding_matrix, num_epochs, batch_size):
         step = parameters['step'] + 1
 
     for epoch in range(num_epochs):
+
         for batch_number, data in enumerate(tqdm(train_loader)):          
             data = remove_data(data, remove_passages='no_ground_truth')
             if len(data[0]) != 0:
@@ -118,6 +119,7 @@ def pretrain(dataset, embedding_matrix, num_epochs, batch_size):
                  loss += batch_loss.item()
                  batch_loss.backward() 
                  optimizer.step()
+
 
                 # log average loss per 100 batches
                  if gd_batch != 0 and gd_batch % 100 == 0:
@@ -141,10 +143,13 @@ def train(dataset, embedding_matrix, pretrained_parameters_filepath, num_epochs,
     :return:
     '''
 
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     embedding_matrix = torch.Tensor(embedding_matrix)
 
     # Load Dataset with the dataloader
+
     train_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False, num_workers=0)
 
     #Pretrain Answer Selection
@@ -152,6 +157,7 @@ def train(dataset, embedding_matrix, pretrained_parameters_filepath, num_epochs,
     model.load_parameters(filepath="/local/fgoessl/test_n_stuff/trained_model_backup/test_file_parameters.pth")
     model.reset_batch_size(batch_size)
     freeze_candidate_extraction(model)
+
     parameters = list(filter(lambda p: p.requires_grad, model.parameters()))
     optimizer = optim.RMSprop(parameters, lr=args.lr, alpha=0.99, eps=1e-08, weight_decay=0, momentum=0, centered=False)
     criterion = nn.CrossEntropyLoss()
@@ -183,52 +189,50 @@ def train(dataset, embedding_matrix, pretrained_parameters_filepath, num_epochs,
     model.store_parameters('test_file_parameters.pth', optimizer, batch_loss, step)
 
 
-'''
+
 def test(model, dataset, batch_size):
-    
+    '''
     Test on dev set.
     :param model:
     :return:
-    
+    '''
     # Load dataset
     train_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False)
 
     # Set device
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    criterion = nn.CrossEntropyLoss()
+    step = 0
+    model.eval()
+    results = {'rewards': [], 'exact_match': [], 'f1': []}
 
     # Disable gradient as we do not conduct backpropagation
     with torch.set_grad_enabled(False):
         for batch_number, data in enumerate(train_loader):
-            model.forward(data)
-            batch_loss = criterion(p1, batch.s_idx) + criterion(p2, batch.e_idx)
-            loss += batch_loss.item()
+            data = remove_data(data, remove_passages='empty')
+            print(f'batch number {batch_number}.')
+            if len(data[0]) != 0:
+                prediction, ground_truth_answer = model.forward(data, pretraining = False)
+                
+                R = reward(prediction, ground_truth_answer, (prediction != 0).sum(), (ground_truth_answer != 0).sum())
+                print(R)
+                if R == 2:
+                    em_score = 1
+                    f1_score = 1
+                elif R == -1:
+                    em_score = 0
+                    f1_score = 0
+                else:
+                    em_score = 0
+                    f1_score = R
+                results['rewards'].append(R)
+                results['exact_match'].append(em_score)
+                results['f1'].append(f1_score)
 
-            # (batch, c_len, c_len)
-            batch_size, c_len = p1.size()
-            ls = nn.LogSoftmax(dim=1)
-            mask = (torch.ones(c_len, c_len) * float('-inf')).to(device).tril(-1).unsqueeze(0).expand(batch_size, -1,
-                                                                                                      -1)
-            score = (ls(p1).unsqueeze(2) + ls(p2).unsqueeze(1)) + mask
-            score, s_idx = score.max(dim=1)
-            score, e_idx = score.max(dim=1)
-            s_idx = torch.gather(s_idx, 1, e_idx.view(-1, 1)).squeeze()
+                #wandb.log({'Reward': reward, 'Exact-Match Score': em_score, 'F1-Score': f1_score, 'Loss': loss}, step=batch_number)
+            
+    return results['exact_match'], results['f1'] #do we need to return something like loss / len(data)
 
-            for i in range(batch_size):
-                id = batch.id[i]
-                answer = batch.c_word[0][i][s_idx[i]:e_idx[i] + 1]
-                answer = ' '.join([data.WORD.vocab.itos[idx] for idx in answer])
-                answers[id] = answer
-
-        for name, param in model.named_parameters():
-            if param.requires_grad:
-                param.data.copy_(backup_params.get(name))
-
-    with open(args.prediction_file, 'w', encoding='utf-8') as f:
-        print(json.dumps(answers), file=f)
-
-    results = evaluate.main(args)
-    return loss, results['exact_match'], results['f1']
-'''
 
 def main(embedding_matrix, id2v, train_corpora, test_corpora):
     '''
@@ -244,12 +248,14 @@ def main(embedding_matrix, id2v, train_corpora, test_corpora):
     print('embedding matrix loaded')
 
     # Retrieve the filepaths of all encoded corpora
+
     train_files = get_file_paths(train_corpora)
     
     # Train Candidate Selection part
     for file in train_files:
         with open(file, 'rb') as f:
             print('Loading', f)
+
             dataset = ru.renamed_load(f)
             pretrain(dataset, embedding_matrix, batch_size=100, num_epochs=args.num_epochs)
    
@@ -284,3 +290,4 @@ if __name__ == '__main__':
 
     # Call main()
     main(embedding_matrix=args.emb, id2v=args.id2v, train_corpora=args.input_train, test_corpora=args.input_test)
+

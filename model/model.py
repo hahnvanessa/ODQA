@@ -13,6 +13,7 @@ from utils.loss import reward
 
 class ODQA(nn.Module):
 
+
     def __init__ (self, k, max_sequence_length, batch_size, embedding_matrix, device):
         print('Starting Model Initialization')
         super(ODQA, self).__init__()
@@ -193,3 +194,4 @@ class ODQA(nn.Module):
         if pretraining:
             return encoded_candidates, p_C, answers[0], candidate_with_highest_reward
         return encoded_candidates, p_C, answers[0] #encoded_candidates[index][0][0], questions[0], answers[0]
+
