@@ -190,7 +190,7 @@ def train(dataset, embedding_matrix, pretrained_parameters_filepath, num_epochs,
 
 
 
-def test(model, dataset, batch_size):
+def test(dataset, embedding_matrix, batch_size):
     '''
     Test on dev set.
     :param model:
@@ -200,6 +200,12 @@ def test(model, dataset, batch_size):
     train_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False)
 
     # Set device
+    embedding_matrix = torch.Tensor(embedding_matrix)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = ODQA(k=K, max_sequence_length=MAX_SEQUENCE_LENGTH, batch_size=100, embedding_matrix=embedding_matrix, device=device).to(device)
+    parameters = torch.load("/local/saveleva/QA/0.0001_2epochs/test_file_parameters.pth")
+    model.load_state_dict(parameters['model_state'])
+    model.reset_batch_size(100)
 
     criterion = nn.CrossEntropyLoss()
     step = 0
@@ -210,12 +216,10 @@ def test(model, dataset, batch_size):
     with torch.set_grad_enabled(False):
         for batch_number, data in enumerate(train_loader):
             data = remove_data(data, remove_passages='empty')
-            print(f'batch number {batch_number}.')
             if len(data[0]) != 0:
                 prediction, ground_truth_answer = model.forward(data, pretraining = False)
                 
                 R = reward(prediction, ground_truth_answer, (prediction != 0).sum(), (ground_truth_answer != 0).sum())
-                print(R)
                 if R == 2:
                     em_score = 1
                     f1_score = 1
@@ -226,12 +230,12 @@ def test(model, dataset, batch_size):
                     em_score = 0
                     f1_score = R
                 results['rewards'].append(R)
-                results['exact_match'].append(em_score)
+                results['exact_match'].appensd(em_score)
                 results['f1'].append(f1_score)
 
-                #wandb.log({'Reward': reward, 'Exact-Match Score': em_score, 'F1-Score': f1_score, 'Loss': loss}, step=batch_number)
+                wandb.log({'Reward': R, 'Exact-Match Score': em_score, 'F1-Score': f1_score}, step=batch_number)
             
-    return results['exact_match'], results['f1'] #do we need to return something like loss / len(data)
+    return results['rewards'], results['exact_match'], results['f1']
 
 
 def main(embedding_matrix, id2v, train_corpora, test_corpora):
@@ -250,7 +254,8 @@ def main(embedding_matrix, id2v, train_corpora, test_corpora):
     # Retrieve the filepaths of all encoded corpora
 
     train_files = get_file_paths(train_corpora)
-    
+    test_files = get_file_paths(test_corpora)
+    '''
     # Train Candidate Selection part
     for file in train_files:
         with open(file, 'rb') as f:
@@ -265,6 +270,14 @@ def main(embedding_matrix, id2v, train_corpora, test_corpora):
             print('Loading', f)
             dataset = ru.renamed_load(f)
             train(dataset, embedding_matrix, batch_size=100, num_epochs=args.num_epochs)
+    '''
+    #Testing
+    for file in test_files:
+        with open(file, 'rb') as f:
+            print('Loading', f)
+            dataset = ru.renamed_load(f)
+            rewards, em_scores, f1_scores = test(dataset, embedding_matrix, batch_size=100)
+            print(f'Average reward {sum(rewards)/len(rewards)}, Average Exact Match Score {sum(em_scores)/len(em_scores)}, Average F1 Score{sum(f1_scores)/len(f1_scores)}')
   
 
 if __name__ == '__main__':
