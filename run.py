@@ -28,11 +28,8 @@ wandb.init(project="ODQA")
 MAX_SEQUENCE_LENGTH = 100
 K = 2 # Number of extracted candidates per passage
 
-# todo: fix the paths here
-with open(args.id2w, 'rb') as f:
-    idx_2_word_dic = pickle.load(f)
 
-def candidate_to_string(candidate, idx_2_word_dic=idx_2_word_dic):
+def candidate_to_string(candidate, idx_2_word_dic):
     '''
     Turns a tensor of indices into a string. Basically gives us back. Can be used
     to turn our candidates back into sentences.
@@ -230,19 +227,21 @@ def test(model, dataset, batch_size):
     return loss, results['exact_match'], results['f1']
 '''
 
-def main(embedding_matrix, train_corpora, test_corpora):
+def main(embedding_matrix, id2v, train_corpora, test_corpora):
     '''
     Iterates through all given corpus files and forwards the encoded contexts and questions
     through the BILSTMs.
     :param embedding_matrix:
     :param encoded_corpora:
     '''
-
+    with open(id2v, 'rb') as f:
+        idx_2_word_dic = pickle.load(f)
+    
     embedding_matrix = pickle.load(open(embedding_matrix, 'rb'))
     print('embedding matrix loaded')
 
     # Retrieve the filepaths of all encoded corpora
-    train_files = get_file_paths(args.train_corpora)
+    train_files = get_file_paths(train_corpora)
     
     # Train Candidate Selection part
     for file in train_files:
@@ -270,7 +269,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--emb', help='Path to the embedding matrix file')
     parser.add_argument(
-        '--id2w', help='Path to the idx to word dictionary file')
+        '--id2v', help='Path to the idx to word dictionary file')
     parser.add_argument(
         '--input_train', help='Path to the folder containing training files')
     parser.add_argument(
@@ -281,4 +280,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Call main()
-    main(embedding_matrix=args.emb, train_corpora=args.input_train, test_corpora=args.input_test)
+    main(embedding_matrix=args.emb, id2v=args.id2v, train_corpora=args.input_train, test_corpora=args.input_test)
