@@ -56,6 +56,9 @@ def freeze_candidate_extraction(model):
         p.requires_grad = False
     for p in model.candidate_scorer.we.parameters():
         p.requires_grad = False
+    # This freezes the sp bilstm in part 2!
+    for p in model.sp_bilstm.parameters():
+        p.requires_grad = False
 
 
 def get_file_paths(data_dir):
