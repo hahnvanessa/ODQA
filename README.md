@@ -4,7 +4,7 @@ Reimplementation of https://www.aclweb.org/anthology/P18-1159/ for the course Ad
 
 ## Installation Requirements 
 ```bash
-pip install - requirements.txt
+pip install -r requirements.txt
 ```
 
 ## Data preprocessing
