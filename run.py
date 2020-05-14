@@ -72,88 +72,29 @@ def get_file_paths(data_dir):
     return file_names
 
 
-# todo: batch size must be varied manually depending on whether we use searchqa or quasar
-def batch_training(dataset, embedding_matrix, pretrained_parameters_filepath=None, batch_size=100, num_epochs=10):
+def pretrain(dataset, embedding_matrix, pretrained_parameters_filepath, num_epochs, batch_size):
     '''
-    Performs minibatch training. One datapoint is a question-context-answer pair.
+    Performs minibatch pre-training of the Candidate Extraction Module. 
+    One datapoint is a question-context-answer pair.
     :param dataset:
     :param embedding_matrix:
     :param batch_size:
     :param num_epochs:
     :return:
     '''
-    # Offer a sacrifice to the Cuda-God so that it may reward us with high accuracy
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    embedding_matrix = torch.Tensor(embedding_matrix).to(device)
 
-    # Load Dataset with the dataloader
-    train_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False, num_workers=0) #num_workers = 4 * num_gpu, but divide by half cuz sharing is caring
-
-    # Initialize model
-    if pretrained_parameters_filepath == None:
-        model = ODQA(k=K, max_sequence_length=MAX_SEQUENCE_LENGTH, batch_size=batch_size, embedding_matrix=embedding_matrix, device=device).to(device)	
-    else:
-        model = ODQA(k=K, max_sequence_length=MAX_SEQUENCE_LENGTH, batch_size=batch_size, embedding_matrix=embedding_matrix, device=device).to(device)
-        model.load_parameters(filepath=pretrained_parameters_filepath)
-        model.reset_batch_size(batch_size)
-
-
-    # torch settings
-    #todo: check wheter ALL our parameters are in there e.g. candiate_representation
-    parameters = list(filter(lambda p: p.requires_grad, model.parameters()))
-    #todo: set these to proper values
-    optimizer = optim.RMSprop(parameters, lr=0.01, alpha=0.99, eps=1e-08, weight_decay=0, momentum=0, centered=False)
-    criterion = nn.CrossEntropyLoss() #https://stackoverflow.com/questions/49390842/cross-entropy-in-pytorch
-
-    for epoch in range(num_epochs):
-        for batch_number, data in enumerate(train_loader):
-            print(f'epoch number {epoch} batch number {batch_number}.')
-            predicted_answer, question, ground_truth_answer = model.forward(data)
-            predicted_answer_as_strings = candidate_to_string(predicted_answer)
-            ground_truth_answer_as_strings = candidate_to_string(ground_truth_answer)
-            question_as_strings = candidate_to_string(question)
-            print(question_as_strings, predicted_answer_as_strings, ground_truth_answer_as_strings)
-
-            '''
-            optimizer.zero_grad()
-            batch_loss = Loss_Function.loss(predicted_answer, ground_truth_answer)
-            loss += batch_loss.item()
-            batch_loss.backward()
-            optimizer.step()
-            '''
-
-    # Save optimized parameters
-    model.store_parameters('test_file_parameters.pth')
-
-
-
-def pretraining(dataset, embedding_matrix, pretrained_parameters_filepath, num_epochs, batch_size):
-    '''
-    Performs minibatch training. One datapoint is a question-context-answer pair.
-    :param dataset:
-    :param embedding_matrix:
-    :param batch_size:
-    :param num_epochs:
-    :return:
-    '''
-    # Offer a sacrifice to the Cuda-God so that it may reward us with high accuracy
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     embedding_matrix = torch.Tensor(embedding_matrix)
 
-
-
     # Load Dataset with the dataloader
     train_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False, num_workers=0) #num_workers = 4 * num_gpu, but divide by half cuz sharing is caring
 
     # Initialize model
-    '''
     model = ODQA(k=K, max_sequence_length=MAX_SEQUENCE_LENGTH, batch_size=batch_size, embedding_matrix=embedding_matrix, device=device).to(device)	
     parameters = list(filter(lambda p: p.requires_grad, model.parameters()))
-    #todo: set these to proper values
     optimizer = optim.RMSprop(parameters, lr=args.lr, alpha=0.99, eps=1e-08, weight_decay=0, momentum=0, centered=False)
-    #scheduler = lr_scheduler.StepLR(optimizer, step_size=200, gamma=0.1, last_epoch=-1)
 
-    criterion = nn.CrossEntropyLoss() #https://stackoverflow.com/questions/49390842/cross-entropy-in-pytorch https://stackoverflow.com/questions/53936136/pytorch-inputs-for-nn-crossentropyloss
+    criterion = nn.CrossEntropyLoss() 
     criterion.requires_grad = True
     loss = 0
     step = 0
@@ -168,30 +109,44 @@ def pretraining(dataset, embedding_matrix, pretrained_parameters_filepath, num_e
 
     for epoch in range(num_epochs):
         for batch_number, data in enumerate(tqdm(train_loader)):          
-            #print(f'pretraining poch number {epoch}/{num_epochs} batch number {batch_number}.')
             data = remove_data(data, remove_passages='no_ground_truth')
             if len(data[0]) != 0:
                  gd_batch += 1
                  k_max_list, gt_span_idxs = pretrain_candidate_scoring(model, data, MAX_SEQUENCE_LENGTH)
                  batch_loss = criterion(k_max_list,gt_span_idxs)
-                 #print('batch loss....: ', batch_loss)	
                  optimizer.zero_grad()
                  loss += batch_loss.item()
                  batch_loss.backward() 
                  optimizer.step()
-                 #scheduler.step(batch_loss)
 
+                # log average loss per 100 batches
                  if gd_batch != 0 and gd_batch % 100 == 0:
                      av_loss = loss / 100
-                     #print(f'total loss per step {loss}')
                      loss = 0
                      wandb.log({'pretraining loss (extraction)': av_loss, 
                                 'lr': args.lr}, step=step)
                      step += 1
-        #scheduler.step()
+
     model.store_parameters('test_file_parameters.pth', optimizer, batch_loss, step)
 
+
+def train(dataset, embedding_matrix, pretrained_parameters_filepath, num_epochs, batch_size):
     '''
+    Performs minibatch training of the Answer Selection Module. 
+    One datapoint is a question-context-answer pair.
+    :param dataset:
+    :param embedding_matrix:
+    :param batch_size:
+    :param num_epochs:
+    :return:
+    '''
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    embedding_matrix = torch.Tensor(embedding_matrix)
+
+    # Load Dataset with the dataloader
+    train_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False, num_workers=0)
+
     #Pretrain Answer Selection
     model = ODQA(k=K, max_sequence_length=MAX_SEQUENCE_LENGTH, batch_size=batch_size, embedding_matrix=embedding_matrix, device=device).to(device)
     model.load_parameters(filepath="/local/fgoessl/test_n_stuff/trained_model_backup/test_file_parameters.pth")
@@ -199,35 +154,33 @@ def pretraining(dataset, embedding_matrix, pretrained_parameters_filepath, num_e
     freeze_candidate_extraction(model)
     parameters = list(filter(lambda p: p.requires_grad, model.parameters()))
     optimizer = optim.RMSprop(parameters, lr=args.lr, alpha=0.99, eps=1e-08, weight_decay=0, momentum=0, centered=False)
-    criterion = nn.CrossEntropyLoss() #https://stackoverflow.com/questions/49390842/cross-entropy-in-pytorch https://stackoverflow.com/questions/53936136/pytorch-inputs-for-nn-crossentropyloss
+    criterion = nn.CrossEntropyLoss()
     criterion.requires_grad = True
     loss = 0
     step = 0
     gd_batch = 0
 
     for epoch in range(num_epochs):
-        for batch_number, data in enumerate(train_loader):
+        for batch_number, data in enumerate(tqdm(train_loader)):
             data = remove_data(data, remove_passages='empty')
-            print(f'epoch number {epoch} batch number {batch_number}.')
             if len(data[0]) != 0:
                 gd_batch += 1
                 candidates, candidate_scores, ground_truth_answer, max_index = model.forward(data, pretraining = True)
                 batch_loss = criterion(candidate_scores,max_index)
-                #print(candidate_scores)
-                print('batch loss....: ', batch_loss)   
                 optimizer.zero_grad()
                 loss += batch_loss.item()
                 batch_loss.backward()
 
                 optimizer.step()
 
+                # log average loss per 100 batches
                 if gd_batch != 0 and gd_batch % 100 == 0:
                     av_loss = loss / 100
                     loss = 0
-                    wandb.log({'pretraining 2 loss (extraction)': av_loss}, step=step)
+                    wandb.log({'pretraining 2 loss (selection)': av_loss}, step=step)
                     step += 1
                 
-    model.store_parameters('test_file_parameters.pth')
+    model.store_parameters('test_file_parameters.pth', optimizer, batch_loss, step)
 
 
 '''
@@ -283,7 +236,6 @@ def main(embedding_matrix, encoded_corpora):
     through the BILSTMs.
     :param embedding_matrix:
     :param encoded_corpora:
-    :return:
     '''
 
     embedding_matrix = pickle.load(open(embedding_matrix, 'rb'))
@@ -292,30 +244,24 @@ def main(embedding_matrix, encoded_corpora):
     # Retrieve the filepaths of all encoded corpora
     file_paths = get_file_paths(encoded_corpora)
 
-    qp_representations = {}
-    int_representations = {}
-
-    # Testing
-
     testfiles = ['/local/fgoessl/outputs/outputs_v4/QUA_Class_files/qua_classenc_quasar_dev_short.pkl', '/local/fgoessl/outputs/outputs_v4/QUA_Class_files/qua_classenc_quasar_test_short.pkl'] #qua_classenc_quasar_dev_short.pkl' 
+    
+    # Train Candidate Selection part
     for testfile in testfiles:
         with open(testfile, 'rb') as f:
             print('Loading', f)
             dataset = ru.renamed_load(f)
+            pretrain(dataset, embedding_matrix, pretrained_parameters_filepath=None, batch_size=100, num_epochs=args.num_epochs)
+   
 
-            # Minibatch training
-            pretraining(dataset, embedding_matrix, pretrained_parameters_filepath=None, batch_size=100, num_epochs=args.num_epochs)
-
-  
-    '''
-    for file in file_paths:
-        with open(os.path.join(file), 'rb') as f:
-            print('Loading... ', f)
+    # Train Answer selection part
+    for testfile in testfiles:
+        with open(testfile, 'rb') as f:
+            print('Loading', f)
             dataset = ru.renamed_load(f)
-            print(f)
-            # Minibatch training
-            batch_training(dataset, embedding_matrix, pretrained_parameters_filepath=None, batch_size=100, num_epochs=10)
-    '''
+            train(dataset, embedding_matrix, pretrained_parameters_filepath=None, batch_size=100, num_epochs=args.num_epochs)
+  
+
 if __name__ == '__main__':
    
     parser = ArgumentParser(
@@ -329,5 +275,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Call main()
-    #main(embedding_matrix=args.embeddings, encoded_corpora=args.data)
     main(embedding_matrix='/local/fgoessl/outputs/outputs_v5/embedding_matrix.pkl', encoded_corpora='/local/fgoessl/outputs/outputs_v4/QUA_Class_files')
