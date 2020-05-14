@@ -297,7 +297,7 @@ def main(embedding_matrix, encoded_corpora):
 
     # Testing
 
-   testfiles = ['/local/fgoessl/outputs/outputs_v4/QUA_Class_files/qua_classenc_quasar_dev_short.pkl', '/local/fgoessl/outputs/outputs_v4/QUA_Class_files/qua_classenc_quasar_test_short.pkl'] #qua_classenc_quasar_dev_short.pkl' 
+    testfiles = ['/local/fgoessl/outputs/outputs_v4/QUA_Class_files/qua_classenc_quasar_dev_short.pkl', '/local/fgoessl/outputs/outputs_v4/QUA_Class_files/qua_classenc_quasar_test_short.pkl'] #qua_classenc_quasar_dev_short.pkl' 
     for testfile in testfiles:
         with open(testfile, 'rb') as f:
             print('Loading', f)
