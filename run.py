@@ -155,7 +155,7 @@ def pretraining(dataset, embedding_matrix, pretrained_parameters_filepath, num_e
 
 
     # Load Dataset with the dataloader
-    train_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False, num_workers=8) #num_workers = 4 * num_gpu, but divide by half cuz sharing is caring
+    train_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False, num_workers=0) #num_workers = 4 * num_gpu, but divide by half cuz sharing is caring
 
     # Initialize model
     '''
@@ -198,7 +198,7 @@ def pretraining(dataset, embedding_matrix, pretrained_parameters_filepath, num_e
     '''
     #Pretrain Answer Selection
     model = ODQA(k=K, max_sequence_length=MAX_SEQUENCE_LENGTH, batch_size=batch_size, embedding_matrix=embedding_matrix, device=device).to(device)
-    model.load_parameters(filepath="searchqa_firsthalf_pretrain1_parameters.pth")
+    model.load_parameters(filepath="/local/fgoessl/test_n_stuff/trained_model_backup/test_file_parameters.pth")
     model.reset_batch_size(batch_size)
     freeze_candidate_extraction(model)
     parameters = list(filter(lambda p: p.requires_grad, model.parameters()))
@@ -215,11 +215,7 @@ def pretraining(dataset, embedding_matrix, pretrained_parameters_filepath, num_e
             print(f'epoch number {epoch} batch number {batch_number}.')
             if len(data[0]) != 0:
                 gd_batch += 1
-                candidates, candidate_scores, ground_truth_answer = model.forward(data, pretraining = True)
-                rewards = []
-                for i in range(candidates.shape[0]):
-                    rewards.append(reward(candidates[i,:], ground_truth_answer, (candidates[i,:] != 0).sum(), (ground_truth_answer != 0).sum()))
-                max_index = torch.LongTensor([rewards.index(max(rewards))]).cuda()
+                candidates, candidate_scores, ground_truth_answer, max_index = model.forward(data, pretraining = True)
                 
                 batch_loss = criterion(candidate_scores,max_index)
                 print('batch loss....: ', batch_loss)   
@@ -238,52 +234,49 @@ def pretraining(dataset, embedding_matrix, pretrained_parameters_filepath, num_e
     model.store_parameters('test_file_parameters.pth')
 
 
-'''
 def test(model, dataset, batch_size):
-    
+    '''
     Test on dev set.
     :param model:
     :return:
-    
+    '''
     # Load dataset
     train_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False)
 
     # Set device
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    criterion = nn.CrossEntropyLoss()
+    step = 0
+    model.eval()
+    results = {'rewards': [], 'exact_match': [], 'f1': []}
 
     # Disable gradient as we do not conduct backpropagation
     with torch.set_grad_enabled(False):
         for batch_number, data in enumerate(train_loader):
-            model.forward(data)
-            batch_loss = criterion(p1, batch.s_idx) + criterion(p2, batch.e_idx)
-            loss += batch_loss.item()
+            data = remove_data(data, remove_passages='empty')
+            print(f'batch number {batch_number}.')
+            if len(data[0]) != 0:
+                prediction, ground_truth_answer = model.forward(data, pretraining = False)
+                
+                R = reward(prediction, ground_truth_answer, (prediction != 0).sum(), (ground_truth_answer != 0).sum())
+                print(R)
+                if R == 2:
+                    em_score = 1
+                    f1_score = 1
+                elif R == -1:
+                    em_score = 0
+                    f1_score = 0
+                else:
+                    em_score = 0
+                    f1_score = R
+                results['rewards'].append(R)
+                results['exact_match'].append(em_score)
+                results['f1'].append(f1_score)
 
-            # (batch, c_len, c_len)
-            batch_size, c_len = p1.size()
-            ls = nn.LogSoftmax(dim=1)
-            mask = (torch.ones(c_len, c_len) * float('-inf')).to(device).tril(-1).unsqueeze(0).expand(batch_size, -1,
-                                                                                                      -1)
-            score = (ls(p1).unsqueeze(2) + ls(p2).unsqueeze(1)) + mask
-            score, s_idx = score.max(dim=1)
-            score, e_idx = score.max(dim=1)
-            s_idx = torch.gather(s_idx, 1, e_idx.view(-1, 1)).squeeze()
+                #wandb.log({'Reward': reward, 'Exact-Match Score': em_score, 'F1-Score': f1_score, 'Loss': loss}, step=batch_number)
+            
+    return results['exact_match'], results['f1'] #do we need to return something like loss / len(data)
 
-            for i in range(batch_size):
-                id = batch.id[i]
-                answer = batch.c_word[0][i][s_idx[i]:e_idx[i] + 1]
-                answer = ' '.join([data.WORD.vocab.itos[idx] for idx in answer])
-                answers[id] = answer
-
-        for name, param in model.named_parameters():
-            if param.requires_grad:
-                param.data.copy_(backup_params.get(name))
-
-    with open(args.prediction_file, 'w', encoding='utf-8') as f:
-        print(json.dumps(answers), file=f)
-
-    results = evaluate.main(args)
-    return loss, results['exact_match'], results['f1']
-'''
 
 def main(embedding_matrix, encoded_corpora):
     '''
@@ -304,16 +297,28 @@ def main(embedding_matrix, encoded_corpora):
     int_representations = {}
 
     # Testing
-    testfile = '/local/fgoessl/outputs/outputs_v5/qua_class_searchqa_train_1.pkl' #qua_classenc_quasar_dev_short.pkl' 
+    '''
+    testfile = '/local/fgoessl/outputs/outputs_v5/qua_class_quasar_train_2.pkl' #qua_classenc_quasar_dev_short.pkl' 
     with open(testfile, 'rb') as f:
         print('Loading', f)
         dataset = ru.renamed_load(f)
 
         # Minibatch training
         pretraining(dataset, embedding_matrix, pretrained_parameters_filepath=None, batch_size=100, num_epochs=args.num_epochs)
-
-  
     '''
+    testfile = '/local/fgoessl/outputs/outputs_v4/QUA_Class_files/qua_classenc_quasar_test_short.pkl' #qua_classenc_quasar_dev_short.pkl' 
+    with open(testfile, 'rb') as f:
+        print('Loading', f)
+        dataset = ru.renamed_load(f)
+        #test
+        embedding_matrix = torch.Tensor(embedding_matrix)
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        model = ODQA(k=K, max_sequence_length=MAX_SEQUENCE_LENGTH, batch_size=100, embedding_matrix=embedding_matrix, device=device).to(device)
+        model.load_parameters(filepath="/local/fgoessl/test_n_stuff/trained_model_backup/test_file_parameters.pth")
+        em_scores, f1_scores = test(model, dataset, batch_size=100)
+        print(sum(em_scores)/len(em_scores), sum(f1_scores)/len(f1_scores))
+    '''
+    
     for file in file_paths:
         with open(os.path.join(file), 'rb') as f:
             print('Loading... ', f)

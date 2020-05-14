@@ -8,6 +8,7 @@ from torch.nn.utils.rnn import pad_packed_sequence as unpack
 from utils.BILSTM import BiLSTM, attention, max_pooling
 from utils.candidate_scoring import Candidate_Scorer
 from utils.candidate_representation import Candidate_Representation
+from utils.loss import reward
 
 
 class ODQA(nn.Module):
@@ -79,12 +80,9 @@ class ODQA(nn.Module):
 		passage_distances = []
 		length = candidates.shape[0]
 		for i in range(length):
-			position_distances = []
-			for p in range(passages.shape[1]):
-				position_distances.append(torch.dist(passages[i,p,:], candidates[i,:,:]))
-			position_distances = torch.stack(position_distances, dim=0)
-			passage_distances.append(position_distances.view(1,passages.shape[1]))
-		return torch.squeeze(torch.stack(passage_distances, dim=0))
+			passage_distances.append(torch.dist(passages[i,:,:], candidates[i,:,:]))
+		distance = torch.squeeze(torch.stack(passage_distances, dim=0))
+		return distance.view(length, 1, 1).expand(length, 100, 1)
 
 
 	def compute_passage_representation(self, questions, contexts, common_word_encodings, q_len, c_len):
@@ -110,7 +108,7 @@ class ODQA(nn.Module):
 		S_P_attention = attention(S_Cs, S_P) #[200,100,200]
 		U_p = torch.cat((S_P, S_P_attention), 2) #[200, 100, 400]
 		S_ps_distance =  self.get_distance(S_P,S_Cs)
-		U_p = torch.cat((U_p, S_ps_distance.view((num_contexts*2,100,1))), 2)
+		U_p = torch.cat((U_p, S_ps_distance), 2)
 		U_p = torch.cat((U_p, r_Cs.view((num_contexts*2,100,1))), 2)
 		U_p = torch.cat((U_p, r_Ctilde.view((num_contexts*2,100,1))), 2)
 		packed_U_p = pack(U_p, candidate_len, batch_first=True, enforce_sorted=False)
@@ -152,21 +150,41 @@ class ODQA(nn.Module):
 		r_Cs = self.candidate_representation.r_Cs  # [200, 100]
 		r_Ctilde = self.candidate_representation.tilda_r_Cs  # [200, 100]
 		encoded_candidates = self.candidate_representation.encoded_candidates
+		# Pretraining Answer Selection
+		'''
+		We need to find the candidate that corresponds to the ground truth answer. The index of that candidate is then fed into the 
+		Cross entropy loss.
+		'''
 		candidate_lengths = []
-		for candidate in encoded_candidates:
-			candidate_len = (candidate != 0).sum()
+		candidate_with_highest_reward = 0 #index of the candidate with the highest reward
+		highest_reward = -1
+		answer_len = (answers[0] != 0).sum()
+		for i, candidate in enumerate(encoded_candidates):
+			candidate_len = (candidate != 0).sum().cuda()
 			if candidate_len > 0:
 				candidate_lengths.append(candidate_len)
+				if pretraining:
+					if highest_reward < 2:
+						if candidate_len == answer_len:
+								candidate_reward_precalculation = reward(candidate, answers[0], candidate_len, answer_len)
+								if highest_reward < candidate_reward_precalculation:
+									highest_reward = candidate_reward_precalculation
+									candidate_with_highest_reward = i
 			else:
 				candidate_lengths.append(torch.tensor(1).cuda())
-		torch.stack(candidate_lengths, dim=0)
+		candidate_lengths = torch.stack(candidate_lengths, dim=0).cuda()
+		candidate_with_highest_reward = torch.LongTensor([candidate_with_highest_reward]).cuda()
 		# Compute an advanced representation of the passage
 		F_p = self.compute_passage_advanced_representation(candidate_len = candidate_lengths, c_len=c_len, S_p=S_p, S_Cs=S_Cs, r_Cs=r_Cs, r_Ctilde= r_Ctilde)
 		# Commpute the probabilities of the candidates (highest should be the ground truth answer)
 		p_C = self.score_answers(F_p, pretraining)
 		# Return the embedding-index version of the candidate with the highest probability
 		# todo: check if this works and if this always returns only one  value
-		#value, index = torch.max(p_C, 0)
+		
 		# todo: Maybe we can use the value to find out how certain the algorithm is about our candidate
 		# todo: returns only one answer for all the datapoints
-		return encoded_candidates, p_C, answers[0] #encoded_candidates[index][0][0], questions[0], answers[0]
+		if pretraining:
+			return encoded_candidates, p_C, answers[0], candidate_with_highest_reward
+		else:
+			value, index = torch.max(p_C, 0)
+			return encoded_candidates[index][0][0], answers[0]

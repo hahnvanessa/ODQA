@@ -31,7 +31,7 @@ def max_pooling(input_tensor, max_sequence_length):
     mxp = nn.MaxPool2d((max_sequence_length, 1),stride=1)
     return mxp(input_tensor)
 
-def attention(question, context):
+def attention(questions, contexts):
     # assuming that input for question and context has dim 54x300 respectively and not 54x1x300
     numerator = torch.exp(torch.bmm(question, torch.transpose(context, 1, 2)))
     denominator = torch.sum(numerator) #index 0?
@@ -43,3 +43,4 @@ def attention(question, context):
     #is h_tP already H_P?
     H_P = h_tP # for now
     return H_P
+    
