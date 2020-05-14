@@ -83,12 +83,10 @@ class ODQA(nn.Module):
         passage_distances = []
         length = candidates.shape[0]
         for i in range(length):
-            position_distances = []
-            for p in range(passages.shape[1]):
-                position_distances.append(torch.dist(passages[i,p,:], candidates[i,:,:]))
-            position_distances = torch.stack(position_distances, dim=0)
-            passage_distances.append(position_distances.view(1,passages.shape[1]))
-        return torch.squeeze(torch.stack(passage_distances, dim=0))
+            passage_distances.append(torch.dist(passages[i,:,:], candidates[i,:,:]))
+        distance = torch.squeeze(torch.stack(passage_distances, dim=0))
+        return distance.view(length, 1, 1).expand(length, 100, 1)
+
 
 
     def compute_passage_representation(self, questions, contexts, common_word_encodings, q_len, c_len):
