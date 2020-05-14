@@ -30,10 +30,12 @@ class Candidate_Representation(nn.Module):
         affected by each other candidate.
         '''
         self.S_p = S_p
+        print(f'sp sums in candidate rep {torch.sum(S_p)}')
         self.spans = spans
         self.passages = passages
         self.M = spans.shape[0] * self.k  # num_passages * num_candidates
         self.S_Cs, self.r_Cs, self.encoded_candidates = self.calculate_condensed_vector_representation()
+        print(f'candidate rep scs {torch.sum(self.S_Cs)} rcs {torch.sum(self.r_Cs)} encoded candidates {torch.sum(self.encoded_candidates)}')
         self.V = self.calculate_correlations()
         self.tilda_r_Cs = self.generate_fused_representation()
 
@@ -72,7 +74,9 @@ class Candidate_Representation(nn.Module):
                 S_Cs.append(S_C)
                 # Condensed Vector Representation
                 # todo: if this is too slow we can take out out of the for loop again
+                #print('r_C before tanh', torch.add(self.wb(sp_cb), self.we(sp_ce)))
                 r_C = torch.add(self.wb(sp_cb), self.we(sp_ce)).tanh() # 1x100
+                #print('r_C after tanh', torch.add(self.wb(sp_cb), self.we(sp_ce)).tanh())
                 r_Cs.append(r_C)
                 # Candidate in encoded form (embedding indices)
                 enc_c = self.passages[p][start_indices[p][i]:end_indices[p][i]+1]
@@ -99,23 +103,26 @@ class Candidate_Representation(nn.Module):
             c = self.wc(r_C) # 1x100
             o = self.wo(rcm) #transpose because first dimensions is 199 instead of 200
             V_jm = self.wv(torch.add(c, o).tanh())
+            
             V_jms.append(V_jm)
 
         V = torch.stack(V_jms, dim=0) #(200x199x1) # should we reshape this to M*M? #V = V.view((self.M,self.M))
-
+        print(f'calculate correlations in candidate rep V {torch.sum(V)}')
         V = V.view(V.shape[0], V.shape[1]) #(200x199)
         return V
 
 
-    def generate_fused_representation(self):
+    def generate_fused_representation(self):    
         # Normalize interactions
 
         alpha_ms = []
         for i, V_jm in enumerate(self.V):
-            numerator = torch.exp(V_jm)
+            numerator = torch.exp(V_jm) # - torch.max(V_jm)
+            #print(f'Fused Nominator shape fused rep V_jm sum was {torch.sum(V_jm)} {numerator.shape} {torch.sum(numerator)}')
             denominator_correlations = torch.cat([self.V[0:i], self.V[i+1:]], dim=0) # (200x199)
-
-            denominator = torch.sum(torch.exp(denominator_correlations), dim=0)
+            #print('fused rep max value activated')
+            denominator = torch.sum(torch.exp(denominator_correlations), dim=0) #-torch.max(denominator_correlations
+            #print(f'Fused Denominator shape {denominator.shape} {torch.sum(denominator)}')
             alpha_m = torch.div(numerator, denominator) # 199x1
             alpha_ms.append(alpha_m)
         alpha = torch.stack(alpha_ms, dim=0) #(200,199)
