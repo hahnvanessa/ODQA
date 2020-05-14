@@ -20,7 +20,7 @@ from torch import nn, optim
 import utils.question_answer_set as question_answer_set
 from utils.loss import Loss_Function
 import utils.rename_unpickler as ru
-from utils.pretraining import remove_data, pretrain_candidate_scoring, pretrain_answer_selection
+from utils.pretraining import remove_data, pretrain_candidate_scoring
 # Init wandb
 import wandb
 wandb.init(project="ODQA")
