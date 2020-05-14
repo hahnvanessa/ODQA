@@ -60,18 +60,6 @@ def freeze_candidate_extraction(model):
     for p in model.candidate_scorer.we.parameters():
         p.requires_grad = False
 
-def get_distance(passages, candidates):
-    ''' Distance feature for advanced passage representation between each position on passage and entire candidate'''
-    passage_distances = []
-    length = candidates.shape[0]
-    for i in range(length):
-        position_distances = []
-        for p in range(passages.shape[1]):
-            position_distances.append(torch.dist(passages[i,p,:], candidates[i,:,:]))
-        position_distances = torch.stack(position_distances, dim=0)
-        passage_distances.append(position_distances.view(1,passages.shape[1]))
-    return torch.squeeze(torch.stack(passage_distances, dim=0))
-
 
 def get_file_paths(data_dir):
     # Get paths for all files in the given directory
@@ -114,7 +102,7 @@ def batch_training(dataset, embedding_matrix, pretrained_parameters_filepath=Non
     #todo: check wheter ALL our parameters are in there e.g. candiate_representation
     parameters = list(filter(lambda p: p.requires_grad, model.parameters()))
     #todo: set these to proper values
-    optimizer = optim.RMSprop(parameters, lr=0.01, alpha=0.99, eps=1e-08, weight_decay=0, momentum=0.00001, centered=False)
+    optimizer = optim.RMSprop(parameters, lr=0.01, alpha=0.99, eps=1e-08, weight_decay=0, momentum=0, centered=False)
     criterion = nn.CrossEntropyLoss() #https://stackoverflow.com/questions/49390842/cross-entropy-in-pytorch
 
     for epoch in range(num_epochs):
@@ -309,7 +297,7 @@ def main(embedding_matrix, encoded_corpora):
 
     # Testing
 
-   testfiles = ['/local/fgoessl/outputs/outputs_v4/QUA_Class_files/qua_classenc_quasar_dev_short.pkl', '/local/fgoessl/outputs/outputs_v4/QUA_Class_files/qua_classenc_quasar_test_short.pkl'] #qua_classenc_quasar_dev_short.pkl' 
+    testfiles = ['/local/fgoessl/outputs/outputs_v4/QUA_Class_files/qua_classenc_quasar_dev_short.pkl', '/local/fgoessl/outputs/outputs_v4/QUA_Class_files/qua_classenc_quasar_test_short.pkl'] #qua_classenc_quasar_dev_short.pkl' 
     for testfile in testfiles:
         with open(testfile, 'rb') as f:
             print('Loading', f)
