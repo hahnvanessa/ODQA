@@ -44,6 +44,6 @@ def attention(questions, contexts):
     #H_P = torch.cat(, dim=0) #dim -> 54,300
     #is h_tP already H_P?
     H_P = h_tP # for now
-    print('sum attention', torch.sum(H_P))
+    #print('sum attention', torch.sum(H_P))
     return H_P
     

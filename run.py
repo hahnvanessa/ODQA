@@ -87,7 +87,7 @@ def pretrain(dataset, embedding_matrix, num_epochs, batch_size):
     embedding_matrix = torch.Tensor(embedding_matrix)
 
     # Load Dataset with the dataloader
-    train_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False, num_workers=0) #num_workers = 4 * num_gpu, but divide by half cuz sharing is caring
+    train_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False, num_workers=0) 
 
     # Initialize model
     model = ODQA(k=K, max_sequence_length=MAX_SEQUENCE_LENGTH, batch_size=batch_size, embedding_matrix=embedding_matrix, device=device).to(device)	
@@ -132,7 +132,7 @@ def pretrain(dataset, embedding_matrix, num_epochs, batch_size):
     model.store_parameters('test_file_parameters.pth', optimizer, batch_loss, step)
 
 
-def train(dataset, embedding_matrix, pretrained_parameters_filepath, num_epochs, batch_size):
+def train(dataset, embedding_matrix, num_epochs, batch_size, id_file):
     '''
     Performs minibatch training of the Answer Selection Module. 
     One datapoint is a question-context-answer pair.
@@ -142,7 +142,6 @@ def train(dataset, embedding_matrix, pretrained_parameters_filepath, num_epochs,
     :param num_epochs:
     :return:
     '''
-
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -154,7 +153,8 @@ def train(dataset, embedding_matrix, pretrained_parameters_filepath, num_epochs,
 
     #Pretrain Answer Selection
     model = ODQA(k=K, max_sequence_length=MAX_SEQUENCE_LENGTH, batch_size=batch_size, embedding_matrix=embedding_matrix, device=device).to(device)
-    model.load_parameters(filepath="/local/fgoessl/test_n_stuff/trained_model_backup/test_file_parameters.pth")
+    parameter = torch.load("test_file_parameters.pth")
+    model.load_state_dict(parameter['model_state'])
     model.reset_batch_size(batch_size)
     freeze_candidate_extraction(model)
 
@@ -163,6 +163,11 @@ def train(dataset, embedding_matrix, pretrained_parameters_filepath, num_epochs,
     criterion = nn.CrossEntropyLoss()
     criterion.requires_grad = True
     loss = 0
+    if id_file == 0:
+        step = 0
+    else:
+        step = parameter['step'] + 1
+    gd_batch = 0
     step = 0
     gd_batch = 0
 
@@ -255,7 +260,7 @@ def main(embedding_matrix, id2v, train_corpora, test_corpora):
 
     train_files = get_file_paths(train_corpora)
     test_files = get_file_paths(test_corpora)
-    '''
+
     # Train Candidate Selection part
     for file in train_files:
         with open(file, 'rb') as f:
@@ -263,15 +268,15 @@ def main(embedding_matrix, id2v, train_corpora, test_corpora):
 
             dataset = ru.renamed_load(f)
             pretrain(dataset, embedding_matrix, batch_size=100, num_epochs=args.num_epochs)
-   
+
     # Train Answer selection part
-    for file in train_files:
+    for i, file in enumerate(train_files):
         with open(file, 'rb') as f:
             print('Loading', f)
             dataset = ru.renamed_load(f)
-            train(dataset, embedding_matrix, batch_size=100, num_epochs=args.num_epochs)
-    '''
-    #Testing
+            train(dataset, embedding_matrix, batch_size=100, num_epochs=args.num_epochs, id_file=i)
+   
+    # Testing
     for file in test_files:
         with open(file, 'rb') as f:
             print('Loading', f)

@@ -54,15 +54,12 @@ def pretrain_candidate_scoring(model, dataset, MAX_SEQUENCE_LENGTH):
 	common_word_encodings = common_word_encodings.to(model.device)
 	gt_spans = gt_spans.to(model.device)
 
-<<<<<<< HEAD
 	C_spans, k_max_list = model.extract_candidates(questions, contexts, q_len, c_len, k=MAX_SEQUENCE_LENGTH*MAX_SEQUENCE_LENGTH, pretraining=False)
 	#_, max_idx = k_max_list.max(1) # return indicies of max probabilities
 	#max_spans = C_spans[torch.arange(C_spans.shape[0]).unsqueeze(-1), max_idx] # get spans with max probability (https://stackoverflow.com/questions/55628014/indexing-a-3d-tensor-using-a-2d-tensor)
 	sgt_span_idxs = []
-=======
 	C_spans, k_max_list = model.extract_candidates(questions, contexts, q_len, c_len, k=MAX_SEQUENCE_LENGTH*MAX_SEQUENCE_LENGTH, pretraining=True)
 	gt_span_idxs = []
->>>>>>> 14783b0ed65ec871ded3d917aa76e1d7da95a182
 	for i, gt_span in enumerate(gt_spans):
 		gt_span_idx = torch.where((C_spans[i]==gt_span).all(dim=1)) # find ground truth index in the spans
 		gt_span_idxs.append(gt_span_idx)
