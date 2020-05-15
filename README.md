@@ -19,7 +19,7 @@ For encoding please add a glove file and all converted files in output, then run
 python3 embeddings.py --out /local/user/output 
 ```
 
-### Preprocessing
+### Preprocessing and Dataset objects
 To do the final preprocessing of all the encoded files call:
 ```python
 python dict_to_qas.py --out /local/user/output 
