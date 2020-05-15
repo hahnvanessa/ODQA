@@ -15,7 +15,7 @@ from itertools import islice
 # Disable spacy components to speed up tokenization
 nlp = spacy.load('en_core_web_sm',
                  disable=['tagger', 'parser', 'ner', 'print_info'])
-# todo: multiprocessing
+
 # Handle the file paths
 from pathlib import Path
 # Typing
@@ -24,7 +24,7 @@ from typing import Tuple
 
 # Parameters
 MAX_SEQUENCE_LENGTH = 100  
-VOCAB_SIZE = 100000  # todo: decide on vocab size, not specified by paper, good value might be 20000
+VOCAB_SIZE = 100000  
 EMBEDDING_DIM = 300  # 300 dimensions as specified by paper
 PAD_IDENTIFIER = '<PAD>'
 UNKNOWN_IDENTIFIER = '<UNK>'
