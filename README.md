@@ -8,9 +8,15 @@ pip install -r requirements.txt
 ```
 
 ## Data preprocessing
-Prepare the files for encoding.
+### Data conversion
+Use this command for every file to convert and save it as a pickled dictionary object:
 ```python
 python3 preprocessing.py -t "searchqa" -f /local/user/output/searchQA  -s "test"
+```
+### Encoding
+For encoding please add a glove file and all converted files in output, then run:
+```python
+python3 embeddings.py --out /local/user/output 
 ```
 
 ## Usage 
