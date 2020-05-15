@@ -1,6 +1,7 @@
 from argparse import ArgumentParser
 from utils.BILSTM import BiLSTM, attention, max_pooling
 from utils.loss import reward
+import json
 import os
 import pickle
 import numpy as np
@@ -44,8 +45,8 @@ def candidate_to_string(candidate, idx_2_word_dic):
     print(values, indices)
     print(candidate_to_string(encoded_candidates[indices]))
     '''
-    return [idx_2_word_dic[i] for i in candidate.tolist() if i != 0]
-   
+    return ' '.join(map(str, [idx_2_word_dic[i] for i in candidate.tolist() if i != 0]))
+
 def freeze_candidate_extraction(model):
     ''' Freezes the parameters in the candidate extraction part of the model'''
     for p in model.qp_bilstm.parameters():
@@ -190,7 +191,7 @@ def train(dataset, embedding_matrix, pretrained_parameters_filepath, num_epochs,
 
 
 
-def test(dataset, embedding_matrix, batch_size):
+def test(dataset, embedding_matrix, idx2word, batch_size):
     '''
     Test on dev set.
     :param model:
@@ -211,30 +212,43 @@ def test(dataset, embedding_matrix, batch_size):
     step = 0
     model.eval()
     results = {'rewards': [], 'exact_match': [], 'f1': []}
+    output = {'questions': []}
 
     # Disable gradient as we do not conduct backpropagation
     with torch.set_grad_enabled(False):
         for batch_number, data in enumerate(train_loader):
-            data = remove_data(data, remove_passages='empty')
-            if len(data[0]) != 0:
-                prediction, ground_truth_answer = model.forward(data, pretraining = False)
-                
-                R = reward(prediction, ground_truth_answer, (prediction != 0).sum(), (ground_truth_answer != 0).sum())
-                if R == 2:
-                    em_score = 1
-                    f1_score = 1
-                elif R == -1:
-                    em_score = 0
-                    f1_score = 0
-                else:
-                    em_score = 0
-                    f1_score = R
-                results['rewards'].append(R)
-                results['exact_match'].appensd(em_score)
-                results['f1'].append(f1_score)
+            while batch_number < 10:
+                data = remove_data(data, remove_passages='empty')
+                if len(data[0]) != 0:
+                    prediction, question, ground_truth_answer = model.forward(data, pretraining = False)
 
-                wandb.log({'Reward': R, 'Exact-Match Score': em_score, 'F1-Score': f1_score}, step=batch_number)
-            
+                    question_string = candidate_to_string(question, idx2word)
+                    prediction_string = candidate_to_string(prediction, idx2word)
+                    ground_truth_string = candidate_to_string(ground_truth_answer, idx2word)
+
+                    R = reward(prediction, ground_truth_answer, (prediction != 0).sum(), (ground_truth_answer != 0).sum())
+                    
+                    output['questions'].append({'question': question_string, 'prediction': prediction_string, 'ground truth': ground_truth_string, 'reward': R})
+                    
+                    if R == 2:
+                        em_score = 1
+                        f1_score = 1
+                    elif R == -1:
+                        em_score = 0
+                        f1_score = 0
+                    else:
+                        em_score = 0
+                        f1_score = R
+                    results['rewards'].append(R)
+                    results['exact_match'].appensd(em_score)
+                    results['f1'].append(f1_score)
+
+                    wandb.log({'Reward': R, 'Exact-Match Score': em_score, 'F1-Score': f1_score}, step=batch_number)
+                    
+    
+    with open('model_output.txt', 'w') as outfile:
+        json.dump(output, outfile)
+
     return results['rewards'], results['exact_match'], results['f1']
 
 
@@ -255,6 +269,7 @@ def main(embedding_matrix, id2v, train_corpora, test_corpora):
 
     train_files = get_file_paths(train_corpora)
     test_files = get_file_paths(test_corpora)
+
     '''
     # Train Candidate Selection part
     for file in train_files:
@@ -276,7 +291,7 @@ def main(embedding_matrix, id2v, train_corpora, test_corpora):
         with open(file, 'rb') as f:
             print('Loading', f)
             dataset = ru.renamed_load(f)
-            rewards, em_scores, f1_scores = test(dataset, embedding_matrix, batch_size=100)
+            rewards, em_scores, f1_scores = test(dataset, embedding_matrix, idx_2_word_dic, batch_size=100)
             print(f'Average reward {sum(rewards)/len(rewards)}, Average Exact Match Score {sum(em_scores)/len(em_scores)}, Average F1 Score{sum(f1_scores)/len(f1_scores)}')
   
 
