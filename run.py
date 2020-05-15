@@ -271,8 +271,7 @@ def main(embedding_matrix, id2v, train_corpora, test_corpora):
     for file in train_files:
         with open(file, 'rb') as f:
             print('Loading', f)
-
-           dataset = ru.renamed_load(f)
+            dataset = ru.renamed_load(f)
             pretrain(dataset, embedding_matrix, batch_size=100, num_epochs=args.num_epochs)
 
     # Train Answer selection part
