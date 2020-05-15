@@ -36,7 +36,7 @@ def main(dirpath):
                     
 if __name__ == "__main__":
     parser = ArgumentParser(description='Turns all encoded dict files into question answer set objects')
-    parser.add_argument('--out', default='/local/fgoessl/outputs', type=str, help='Path to output directory')
+    parser.add_argument('--out', default='/local/fgoessl/output', type=str, help='Path to output directory')
     # Parse given arguments
     args = parser.parse_args()
     print(args.out)
