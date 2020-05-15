@@ -9,7 +9,7 @@ pip install -r requirements.txt
 
 ## Data preprocessing
 ### Data conversion
-Use this command for every file to convert and save it as a pickled dictionary object:
+Use a variation of this command for every file to convert and save it as a pickled dictionary object:
 ```python
 python3 preprocessing.py -t "searchqa" -f /local/user/output/searchQA  -s "test"
 ```
