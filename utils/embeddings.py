@@ -243,7 +243,7 @@ def encode_untokenized_file(DATASET_PATH, filename, word_2_idx, type='quasar'):
     return enc_corpus_dict
 
 
-def load_matrix_and_mapping_dictionaries(OUTPUT_PATH_ENCODED='/local/fgoessl/outputs'):
+def load_matrix_and_mapping_dictionaries(OUTPUT_PATH_ENCODED='/local/fgoessl/output'):
     '''
     Loads the embedding matrix, the index2word dictionary and the word2index dictionary from disk.
     :return:
