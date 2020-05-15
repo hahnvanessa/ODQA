@@ -5,7 +5,7 @@ import torch.nn.functional as F
 class Candidate_Scorer(nn.Module):
 	def __init__(self):
 		super(Candidate_Scorer, self).__init__()
-		self.wb = nn.Linear(200, 1, bias=False) #1 is the output shape because we want one score as output
+		self.wb = nn.Linear(200, 1, bias=False)
 		self.we = nn.Linear(200, 1, bias=False)
 
 

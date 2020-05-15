@@ -208,7 +208,7 @@ def test(dataset, embedding_matrix, batch_size):
     embedding_matrix = torch.Tensor(embedding_matrix)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = ODQA(k=K, max_sequence_length=MAX_SEQUENCE_LENGTH, batch_size=100, embedding_matrix=embedding_matrix, device=device).to(device)
-    parameters = torch.load("/local/saveleva/QA/0.0001_2epochs/test_file_parameters.pth")
+    parameters = torch.load("test_file_parameters.pth")
     model.load_state_dict(parameters['model_state'])
     model.reset_batch_size(100)
 

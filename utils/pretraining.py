@@ -55,8 +55,6 @@ def pretrain_candidate_scoring(model, dataset, MAX_SEQUENCE_LENGTH):
 	gt_spans = gt_spans.to(model.device)
 
 	C_spans, k_max_list = model.extract_candidates(questions, contexts, q_len, c_len, k=MAX_SEQUENCE_LENGTH*MAX_SEQUENCE_LENGTH, pretraining=False)
-	#_, max_idx = k_max_list.max(1) # return indicies of max probabilities
-	#max_spans = C_spans[torch.arange(C_spans.shape[0]).unsqueeze(-1), max_idx] # get spans with max probability (https://stackoverflow.com/questions/55628014/indexing-a-3d-tensor-using-a-2d-tensor)
 	sgt_span_idxs = []
 	C_spans, k_max_list = model.extract_candidates(questions, contexts, q_len, c_len, k=MAX_SEQUENCE_LENGTH*MAX_SEQUENCE_LENGTH, pretraining=True)
 	gt_span_idxs = []
