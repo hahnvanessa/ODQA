@@ -8,7 +8,10 @@ pip install -r requirements.txt
 ```
 
 ## Data preprocessing
-
+Prepare the files for encoding.
+```python
+python3 preprocessing.py -t "searchqa" -f /local/user/output/searchQA  -s "test"
+```
 
 ## Usage 
 Collect training and test files in two separate folders. Example of usage: 
