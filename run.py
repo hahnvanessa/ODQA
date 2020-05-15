@@ -45,7 +45,7 @@ def candidate_to_string(candidate, idx_2_word_dic):
     print(values, indices)
     print(candidate_to_string(encoded_candidates[indices]))
     '''
-    return ' '.join(map(str, [idx_2_word_dic[i] for i in candidate.tolist() if i != 0]))
+    return [idx_2_word_dic[i] for i in candidate.tolist() if i != 0]
 
 def freeze_candidate_extraction(model):
     ''' Freezes the parameters in the candidate extraction part of the model'''
@@ -213,47 +213,39 @@ def test(dataset, embedding_matrix, idx2word, batch_size):
     model.load_state_dict(parameters['model_state'])
     model.reset_batch_size(100)
 
-    criterion = nn.CrossEntropyLoss()
-    step = 0
     model.eval()
     results = {'rewards': [], 'exact_match': [], 'f1': []}
     output = {'questions': []}
 
     # Disable gradient as we do not conduct backpropagation
     with torch.set_grad_enabled(False):
-        for batch_number, data in enumerate(train_loader):
-            while batch_number < 10:
-                data = remove_data(data, remove_passages='empty')
-                if len(data[0]) != 0:
-                    prediction, question, ground_truth_answer = model.forward(data, pretraining = False)
+        for batch_number, data in enumerate(tqdm(train_loader)):
+            data = remove_data(data, remove_passages='empty')
+            if len(data[0]) != 0:
+                prediction, ground_truth_answer, question = model.forward(data, pretraining = False)
+                question_string = candidate_to_string(question, idx2word)
+                prediction_string = candidate_to_string(prediction, idx2word)
+                ground_truth_string = candidate_to_string(ground_truth_answer, idx2word)
 
-                    question_string = candidate_to_string(question, idx2word)
-                    prediction_string = candidate_to_string(prediction, idx2word)
-                    ground_truth_string = candidate_to_string(ground_truth_answer, idx2word)
-
-                    R = reward(prediction, ground_truth_answer, (prediction != 0).sum(), (ground_truth_answer != 0).sum())
+                R = reward(prediction, ground_truth_answer, (prediction != 0).sum(), (ground_truth_answer != 0).sum())
                     
-                    output['questions'].append({'question': question_string, 'prediction': prediction_string, 'ground truth': ground_truth_string, 'reward': R})
+                output['questions'].append({'question': question_string, 'prediction': prediction_string, 'ground truth': ground_truth_string, 'reward': R})
                     
-                    if R == 2:
-                        em_score = 1
-                        f1_score = 1
-                    elif R == -1:
-                        em_score = 0
-                        f1_score = 0
-                    else:
-                        em_score = 0
-                        f1_score = R
-                    results['rewards'].append(R)
-                    results['exact_match'].appensd(em_score)
-                    results['f1'].append(f1_score)
+                if R == 2:
+                    em_score = 1
+                    f1_score = 1
+                elif R == -1:
+                    em_score = 0
+                    f1_score = 0
+                else:
+                    em_score = 0
+                    f1_score = R
+                results['rewards'].append(R)
+                results['exact_match'].append(em_score)
+                results['f1'].append(f1_score)
 
-                    wandb.log({'Reward': R, 'Exact-Match Score': em_score, 'F1-Score': f1_score}, step=batch_number)
+                wandb.log({'Reward': R, 'Exact-Match Score': em_score, 'F1-Score': f1_score}, step=batch_number)
                     
-    
-    with open('model_output.txt', 'w') as outfile:
-        json.dump(output, outfile)
-
     return results['rewards'], results['exact_match'], results['f1']
 
 
@@ -280,7 +272,7 @@ def main(embedding_matrix, id2v, train_corpora, test_corpora):
         with open(file, 'rb') as f:
             print('Loading', f)
 
-            dataset = ru.renamed_load(f)
+           dataset = ru.renamed_load(f)
             pretrain(dataset, embedding_matrix, batch_size=100, num_epochs=args.num_epochs)
 
     # Train Answer selection part
