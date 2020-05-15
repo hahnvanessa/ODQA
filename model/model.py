@@ -188,10 +188,10 @@ class ODQA(nn.Module):
         p_C = self.score_answers(F_p=F_p, pretraining=pretraining)
         # Return the embedding-index version of the candidate with the highest probability
         # todo: check if this works and if this always returns only one  value
-        #value, index = torch.max(p_C, 0)
+        value, index = torch.max(p_C, 0)
         # todo: Maybe we can use the value to find out how certain the algorithm is about our candidate
         # todo: returns only one answer for all the datapoints
         if pretraining:
             return encoded_candidates, p_C, answers[0], candidate_with_highest_reward
-        return encoded_candidates, p_C, answers[0] #encoded_candidates[index][0][0], questions[0], answers[0]
+        return encoded_candidates[index][0][0], questions[0], answers[0]
 
