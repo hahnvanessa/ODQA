@@ -12,8 +12,8 @@ class Candidate_Representation(nn.Module):
     def __init__(self, k=2):
         super(Candidate_Representation, self).__init__()
         self.k = k
-        self.wb = nn.Linear(200, 100, bias=False) # not (100,200) because nn.linear transposes automatically
-        self.we = nn.Linear(200, 100, bias=False)  # not (100,200) because nn.linear transposes automatically
+        self.wb = nn.Linear(200, 100, bias=False)
+        self.we = nn.Linear(200, 100, bias=False)
         # Linear transformations to capture the intensity
         # of each interaction (used for the attention mechanism)
         self.wc = nn.Linear(100, 100, bias=False)
@@ -51,8 +51,6 @@ class Candidate_Representation(nn.Module):
         end_indices = self.spans[:, :, 1]
         max_seq_len = self.S_p.shape[1]  # padding length
 
-
-        # todo: check if shape[0] really is the number of candidates
         for p in range(self.S_p.shape[0]):
             # Iterate through the candidates per passage
             for i in range(self.k):
@@ -71,8 +69,7 @@ class Candidate_Representation(nn.Module):
                 S_C = F.pad(input=c, pad=(0, 0, num_start_pads, num_end_pads), mode='constant', value=0)
                 S_Cs.append(S_C)
                 # Condensed Vector Representation
-                # todo: if this is too slow we can take out out of the for loop again
-                r_C = torch.add(self.wb(sp_cb), self.we(sp_ce)).tanh() # 1x100
+                r_C = torch.add(self.wb(sp_cb), self.we(sp_ce)).tanh()
                 r_Cs.append(r_C)
                 # Candidate in encoded form (embedding indices)
                 enc_c = self.passages[p][start_indices[p][i]:end_indices[p][i]+1]
@@ -81,7 +78,7 @@ class Candidate_Representation(nn.Module):
 
         # Stack to turn into tensor
         S_Cs = torch.stack(S_Cs, dim=0)
-        r_Cs = torch.stack(r_Cs, dim=0) # if we stack, the dimensions are 200x1x100, should we concatenate? then we have 200x100
+        r_Cs = torch.stack(r_Cs, dim=0)
         encoded_candidates = torch.stack(encoded_candidates, dim=0)
         return S_Cs, r_Cs, encoded_candidates
 
@@ -90,20 +87,19 @@ class Candidate_Representation(nn.Module):
         Model the interactions via attention mechanism.
         Returns a correlation matrix
         '''
-        #r_Cs = torch.split(self.r_c, 100, dim=0) # TODO: check the dimensions
-
+        
         V_jms = []
 
         for i, r_C in enumerate(self.r_Cs):
             rcm = torch.cat([self.r_Cs[0:i], self.r_Cs[i+1:]], dim=0)
-            c = self.wc(r_C) # 1x100
-            o = self.wo(rcm) #transpose because first dimensions is 199 instead of 200
+            c = self.wc(r_C)
+            o = self.wo(rcm)
             V_jm = self.wv(torch.add(c, o).tanh())
             V_jms.append(V_jm)
 
-        V = torch.stack(V_jms, dim=0) #(200x199x1) # should we reshape this to M*M? #V = V.view((self.M,self.M))
+        V = torch.stack(V_jms, dim=0)
 
-        V = V.view(V.shape[0], V.shape[1]) #(200x199)
+        V = V.view(V.shape[0], V.shape[1])
         return V
 
 
@@ -121,7 +117,7 @@ class Candidate_Representation(nn.Module):
         alpha = torch.stack(alpha_ms, dim=0) #(200,199)
         tilda_rсms = []
         for i, r_C in enumerate(self.r_Cs):
-            rcm = torch.cat([self.r_Cs[0:i], self.r_Cs[i+1:]], dim=0) #maybe alpha is multiplied (199x100)
+            rcm = torch.cat([self.r_Cs[0:i], self.r_Cs[i+1:]], dim=0)
             alpha_m = torch.cat([alpha[0:i], alpha[i+1:]], dim=0) # (199x199)
             tilda_rсm = torch.sum(torch.mm(alpha_m, rcm), dim=0) # (1x100)
             tilda_rсms.append(tilda_rсm)

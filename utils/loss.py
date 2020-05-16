@@ -32,7 +32,7 @@ def reward(c, a, c_len, a_len):
         recall = tp / (tp + fn + epsilon)
 
         f1 = 2 * (precision * recall) / (precision + recall + epsilon)
-        return f1
+        return f1.item()
 
     # Trim padding to candidate len
     #assert c_len >= a_len

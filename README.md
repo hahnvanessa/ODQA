@@ -8,8 +8,22 @@ pip install -r requirements.txt
 ```
 
 ## Data preprocessing
+### Data conversion
+Use a variation of this command for every file to convert and save it as a pickled dictionary object:
+```python
+python3 preprocessing.py -t "searchqa" -f /local/user/output/searchQA  -s "test"
+```
+### Encoding
+For encoding please add a glove file and all converted files in output, then run:
+```python
+python3 embeddings.py --out /local/user/output 
+```
 
-
+### Preprocessing and Dataset objects
+To do the final preprocessing of all the encoded files call:
+```python
+python dict_to_qas.py --out /local/user/output 
+```
 ## Usage 
 Collect training and test files in two separate folders. Example of usage: 
 

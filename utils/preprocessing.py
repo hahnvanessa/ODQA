@@ -65,7 +65,7 @@ def process_quasar(folder, set_type, doc_size) -> dict:
 		print("Question dic of type <quasar> and set type <{}> has {} entries.".format(set_type, len(question_dic)))
 		return question_dic
 
-#todo: causes memory error if used with the train set, the test set works and returns a small file of 43MB
+
 def save_to_file(path, question_dic, type, set_type, doc_size=None):
 	'''
 	Save question dictionary to a file.

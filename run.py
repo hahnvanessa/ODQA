@@ -45,7 +45,7 @@ def candidate_to_string(candidate, idx_2_word_dic):
     print(values, indices)
     print(candidate_to_string(encoded_candidates[indices]))
     '''
-    return ' '.join(map(str, [idx_2_word_dic[i] for i in candidate.tolist() if i != 0]))
+    return [idx_2_word_dic[i] for i in candidate.tolist() if i != 0]
 
 def freeze_candidate_extraction(model):
     ''' Freezes the parameters in the candidate extraction part of the model'''
@@ -88,7 +88,7 @@ def pretrain(dataset, embedding_matrix, num_epochs, batch_size):
     embedding_matrix = torch.Tensor(embedding_matrix)
 
     # Load Dataset with the dataloader
-    train_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False, num_workers=0) #num_workers = 4 * num_gpu, but divide by half cuz sharing is caring
+    train_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False, num_workers=0) 
 
     # Initialize model
     model = ODQA(k=K, max_sequence_length=MAX_SEQUENCE_LENGTH, batch_size=batch_size, embedding_matrix=embedding_matrix, device=device).to(device)	
@@ -133,7 +133,7 @@ def pretrain(dataset, embedding_matrix, num_epochs, batch_size):
     model.store_parameters('test_file_parameters.pth', optimizer, batch_loss, step)
 
 
-def train(dataset, embedding_matrix, pretrained_parameters_filepath, num_epochs, batch_size):
+def train(dataset, embedding_matrix, num_epochs, batch_size, id_file):
     '''
     Performs minibatch training of the Answer Selection Module. 
     One datapoint is a question-context-answer pair.
@@ -143,7 +143,6 @@ def train(dataset, embedding_matrix, pretrained_parameters_filepath, num_epochs,
     :param num_epochs:
     :return:
     '''
-
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -155,7 +154,8 @@ def train(dataset, embedding_matrix, pretrained_parameters_filepath, num_epochs,
 
     #Pretrain Answer Selection
     model = ODQA(k=K, max_sequence_length=MAX_SEQUENCE_LENGTH, batch_size=batch_size, embedding_matrix=embedding_matrix, device=device).to(device)
-    model.load_parameters(filepath="/local/fgoessl/test_n_stuff/trained_model_backup/test_file_parameters.pth")
+    parameter = torch.load("test_file_parameters.pth")
+    model.load_state_dict(parameter['model_state'])
     model.reset_batch_size(batch_size)
     freeze_candidate_extraction(model)
 
@@ -164,6 +164,11 @@ def train(dataset, embedding_matrix, pretrained_parameters_filepath, num_epochs,
     criterion = nn.CrossEntropyLoss()
     criterion.requires_grad = True
     loss = 0
+    if id_file == 0:
+        step = 0
+    else:
+        step = parameter['step'] + 1
+    gd_batch = 0
     step = 0
     gd_batch = 0
 
@@ -204,51 +209,43 @@ def test(dataset, embedding_matrix, idx2word, batch_size):
     embedding_matrix = torch.Tensor(embedding_matrix)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = ODQA(k=K, max_sequence_length=MAX_SEQUENCE_LENGTH, batch_size=100, embedding_matrix=embedding_matrix, device=device).to(device)
-    parameters = torch.load("/local/saveleva/QA/0.0001_2epochs/test_file_parameters.pth")
+    parameters = torch.load("test_file_parameters.pth")
     model.load_state_dict(parameters['model_state'])
     model.reset_batch_size(100)
 
-    criterion = nn.CrossEntropyLoss()
-    step = 0
     model.eval()
     results = {'rewards': [], 'exact_match': [], 'f1': []}
     output = {'questions': []}
 
     # Disable gradient as we do not conduct backpropagation
     with torch.set_grad_enabled(False):
-        for batch_number, data in enumerate(train_loader):
-            while batch_number < 10:
-                data = remove_data(data, remove_passages='empty')
-                if len(data[0]) != 0:
-                    prediction, question, ground_truth_answer = model.forward(data, pretraining = False)
+        for batch_number, data in enumerate(tqdm(train_loader)):
+            data = remove_data(data, remove_passages='empty')
+            if len(data[0]) != 0:
+                prediction, ground_truth_answer, question = model.forward(data, pretraining = False)
+                question_string = candidate_to_string(question, idx2word)
+                prediction_string = candidate_to_string(prediction, idx2word)
+                ground_truth_string = candidate_to_string(ground_truth_answer, idx2word)
 
-                    question_string = candidate_to_string(question, idx2word)
-                    prediction_string = candidate_to_string(prediction, idx2word)
-                    ground_truth_string = candidate_to_string(ground_truth_answer, idx2word)
-
-                    R = reward(prediction, ground_truth_answer, (prediction != 0).sum(), (ground_truth_answer != 0).sum())
+                R = reward(prediction, ground_truth_answer, (prediction != 0).sum(), (ground_truth_answer != 0).sum())
                     
-                    output['questions'].append({'question': question_string, 'prediction': prediction_string, 'ground truth': ground_truth_string, 'reward': R})
+                output['questions'].append({'question': question_string, 'prediction': prediction_string, 'ground truth': ground_truth_string, 'reward': R})
                     
-                    if R == 2:
-                        em_score = 1
-                        f1_score = 1
-                    elif R == -1:
-                        em_score = 0
-                        f1_score = 0
-                    else:
-                        em_score = 0
-                        f1_score = R
-                    results['rewards'].append(R)
-                    results['exact_match'].appensd(em_score)
-                    results['f1'].append(f1_score)
+                if R == 2:
+                    em_score = 1
+                    f1_score = 1
+                elif R == -1:
+                    em_score = 0
+                    f1_score = 0
+                else:
+                    em_score = 0
+                    f1_score = R
+                results['rewards'].append(R)
+                results['exact_match'].append(em_score)
+                results['f1'].append(f1_score)
 
-                    wandb.log({'Reward': R, 'Exact-Match Score': em_score, 'F1-Score': f1_score}, step=batch_number)
+                wandb.log({'Reward': R, 'Exact-Match Score': em_score, 'F1-Score': f1_score}, step=batch_number)
                     
-    
-    with open('model_output.txt', 'w') as outfile:
-        json.dump(output, outfile)
-
     return results['rewards'], results['exact_match'], results['f1']
 
 
@@ -270,23 +267,21 @@ def main(embedding_matrix, id2v, train_corpora, test_corpora):
     train_files = get_file_paths(train_corpora)
     test_files = get_file_paths(test_corpora)
 
-    '''
     # Train Candidate Selection part
     for file in train_files:
         with open(file, 'rb') as f:
             print('Loading', f)
-
             dataset = ru.renamed_load(f)
             pretrain(dataset, embedding_matrix, batch_size=100, num_epochs=args.num_epochs)
-   
+
     # Train Answer selection part
-    for file in train_files:
+    for i, file in enumerate(train_files):
         with open(file, 'rb') as f:
             print('Loading', f)
             dataset = ru.renamed_load(f)
-            train(dataset, embedding_matrix, batch_size=100, num_epochs=args.num_epochs)
-    '''
-    #Testing
+            train(dataset, embedding_matrix, batch_size=100, num_epochs=args.num_epochs, id_file=i)
+   
+    # Testing
     for file in test_files:
         with open(file, 'rb') as f:
             print('Loading', f)

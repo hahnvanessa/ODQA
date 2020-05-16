@@ -54,7 +54,8 @@ def pretrain_candidate_scoring(model, dataset, MAX_SEQUENCE_LENGTH):
 	common_word_encodings = common_word_encodings.to(model.device)
 	gt_spans = gt_spans.to(model.device)
 
-
+	C_spans, k_max_list = model.extract_candidates(questions, contexts, q_len, c_len, k=MAX_SEQUENCE_LENGTH*MAX_SEQUENCE_LENGTH, pretraining=False)
+	sgt_span_idxs = []
 	C_spans, k_max_list = model.extract_candidates(questions, contexts, q_len, c_len, k=MAX_SEQUENCE_LENGTH*MAX_SEQUENCE_LENGTH, pretraining=True)
 	gt_span_idxs = []
 	for i, gt_span in enumerate(gt_spans):

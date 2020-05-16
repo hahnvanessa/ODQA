@@ -186,12 +186,7 @@ class ODQA(nn.Module):
         F_p = self.compute_passage_advanced_representation(candidate_len = candidate_lengths, c_len=c_len, S_p=S_p, S_Cs=S_Cs, r_Cs=r_Cs, r_Ctilde= r_Ctilde)
         # Commpute the probabilities of the candidates (highest should be the ground truth answer)
         p_C = self.score_answers(F_p=F_p, pretraining=pretraining)
-        # Return the embedding-index version of the candidate with the highest probability
-        # todo: check if this works and if this always returns only one  value
         value, index = torch.max(p_C, 0)
-        # todo: Maybe we can use the value to find out how certain the algorithm is about our candidate
-        # todo: returns only one answer for all the datapoints
         if pretraining:
             return encoded_candidates, p_C, answers[0], candidate_with_highest_reward
-        return encoded_candidates[index][0][0], questions[0], answers[0]
-
+        return encoded_candidates[index][0][0], answers[0], questions[0]
